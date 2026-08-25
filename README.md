@@ -90,27 +90,44 @@ Cloud Run region list. Most resolve unambiguously (only one region exists
 in that country); a handful didn't and were disambiguated — **verify these
 against your actual GTM region picker before relying on them**:
 
+### Americas
+
 | Display label | Region code | Note |
 |---|---|---|
-| SA West (Chile) | `southamerica-west1` | |
-| JP Center (Japan) | `asia-northeast1` | ⚠ Defaulted to Tokyo over Osaka (`asia-northeast2`) — no region is officially "center". |
-| ME Center (Qatar) | `me-central1` | |
 | CA East (Canada) | `northamerica-northeast1` | ⚠ Defaulted to Montreal over Toronto (`northamerica-northeast2`). |
 | US Center (Iowa) | `us-central1` | |
 | US East (South Carolina) | `us-east1` | |
 | US West (Oregon) | `us-west1` | |
+| SA East (Brazil) | `southamerica-east1` | |
+| SA West (Chile) | `southamerica-west1` | |
+
+### Europe
+
+| Display label | Region code | Note |
+|---|---|---|
 | EU West (England) | `europe-west2` | ⚠ Source list said "EU North (England)" — no Cloud Run region matches north+England. London is `europe-west2`; relabeled. |
 | EU West (Belgium) | `europe-west1` | |
 | EU West (Germany) | `europe-west3` | ⚠ Source list said "EU Center (Germany)" — GCP's actual central-Europe region is Warsaw, not Germany. Frankfurt is `europe-west3`; relabeled. |
 | EU North (Finland) | `europe-north1` | |
-| AP South (India) | `asia-south1` | ⚠ Defaulted to Mumbai over Delhi (`asia-south2`). |
-| AU East (Australia) | `australia-southeast1` | ⚠ Defaulted to Sydney over Melbourne (`australia-southeast2`). |
-| SA East (Brazil) | `southamerica-east1` | |
-| AP East (Singapore) | `asia-southeast1` | |
+| EU North (Netherlands) | `europe-west4` | Unambiguous — only one Netherlands region exists. |
 | EU East (Poland) | `europe-central2` | |
 | EU Center (France) | `europe-west9` | Unambiguous — only one France region exists, despite the code/label naming mismatch. |
-| EU North (Netherlands) | `europe-west4` | Unambiguous — only one Netherlands region exists. |
 | EU South (Italy) | `europe-west8` | ⚠ Defaulted to Milan over Turin (`europe-west12`). |
+
+### Middle East
+
+| Display label | Region code | Note |
+|---|---|---|
+| ME Center (Qatar) | `me-central1` | |
+
+### Asia-Pacific
+
+| Display label | Region code | Note |
+|---|---|---|
+| JP Center (Japan) | `asia-northeast1` | ⚠ Defaulted to Tokyo over Osaka (`asia-northeast2`) — no region is officially "center". |
+| AP South (India) | `asia-south1` | ⚠ Defaulted to Mumbai over Delhi (`asia-south2`). |
+| AP East (Singapore) | `asia-southeast1` | |
+| AU East (Australia) | `australia-southeast1` | ⚠ Defaulted to Sydney over Melbourne (`australia-southeast2`). |
 
 If any ⚠ default is wrong, it's a one-line edit to the `selectItems` array
 in `template.tpl`.
@@ -129,36 +146,3 @@ zero-cost and meaningfully cuts calls for the dominant case. Disable via the
 "Cache corrections on this server instance" checkbox if it's ever suspect
 during rollout of a ruleset change.
 
-## Required permissions
-
-`read_event_data` and `write_event_data`, both scoped to the five `utm_*`
-keys; `send_http_request` scoped to `https://*.cr.utm-assistant.ai/inflight*`;
-`access_template_storage`; `logging` (debug only). The permission block in
-`template.tpl` was hand-authored, not exported from the GTM Template Editor
-— re-verify the Permissions tab there before first real use.
-
-## Testing
-
-`template.tpl`'s `___TESTS___` box covers, with mocked `getEventData` /
-`setInEventData` / `sendHttpGet` / `templateDataStorage`: no-op when no
-utm_ params are present, request URL/header construction, applying a
-corrected response, cache write-then-hit across two calls, cache
-expiry after the TTL, and fail-open on a non-200 response, an
-unparseable body, and a rejected/timed-out request.
-
-`___TESTS___` content is a YAML document — `scenarios:`, a list of
-`{name, code}` entries, each `code` a `|-` literal block scalar (confirmed
-against a real working template: matomo-org/google-tag-manager-matomo-template).
-Ordinary JS with colons/object literals is fine *inside* a `code: |-` block
-(YAML treats block-scalar content as opaque text), but nothing outside one
-may contain a bare `identifier:` or it gets misread as a YAML mapping key —
-that includes an earlier `___SCENARIOS___` section (not a real section at
-all, removed) and, before this file matched the real format, plain
-top-level JS with `test()`/`mock()` calls. Each scenario is fully
-self-contained (its own `require()`s, its own mocks) since there's no
-shared preamble across list entries in this format.
-
-The test DSL's exact API (`mock`, `assertThat`, `runCode`, `Promise.create`)
-was written from memory, not validated against a live Template Editor —
-open this template there and run the Tests tab before trusting the suite
-green.
