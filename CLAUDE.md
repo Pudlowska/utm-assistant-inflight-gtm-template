@@ -1,7 +1,9 @@
 # gtm-template — CLAUDE.md
 
-The GTM tag + variable template that performs UTM correction on advertiser
-sites. This repo exists on its own — not a subfolder of `main-app` — because
+The GTM tag + variable template for **Inflight**, the real-time UTM
+correction product (first product in the utm-assistant.ai suite — see
+SYSTEM-OVERVIEW.md). This repo exists on its own — not a subfolder of
+`main-app` — because
 the GTM Community Template Gallery requires it: `template.tpl`,
 `metadata.yaml`, and `LICENSE` must sit at the repo root, one template per
 repo, and Google's gallery tooling tracks specific commit SHAs referenced in
