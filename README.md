@@ -21,7 +21,7 @@ template has no client-side/web-container equivalent.
 ## Endpoint
 
 ```
-GET https://{cloud-region}.utm-assistant.ai/inflight?property_id=...&utm_source=...&utm_medium=...&utm_campaign=...&utm_content=...&utm_term=...
+GET https://{cloud-region}.cr.utm-assistant.ai/inflight?property_id=...&utm_source=...&utm_medium=...&utm_campaign=...&utm_content=...&utm_term=...
 X-Api-Key: {apiKey}
 ```
 
@@ -81,13 +81,33 @@ during rollout of a ruleset change.
 ## Required permissions
 
 `read_event_data` and `write_event_data`, both scoped to the five `utm_*`
-keys; `send_http_request` scoped to `https://*.utm-assistant.ai/inflight*`;
+keys; `send_http_request` scoped to `https://*.cr.utm-assistant.ai/inflight*`;
 `access_template_storage`; `logging` (debug only). The permission block in
 `template.tpl` was hand-authored, not exported from the GTM Template Editor
 — re-verify the Permissions tab there before first real use.
 
 ## Testing
 
-Use GTM's built-in template testing/preview mode. Specifically verify the
-fail-open path: a forced timeout or a 500 response must leave utm_ values
-unchanged, never throw or block the event.
+`template.tpl`'s `___TESTS___` box covers, with mocked `getEventData` /
+`setInEventData` / `sendHttpGet` / `templateDataStorage`: no-op when no
+utm_ params are present, request URL/header construction, applying a
+corrected response, cache write-then-hit across two calls, cache
+expiry after the TTL, and fail-open on a non-200 response, an
+unparseable body, and a rejected/timed-out request.
+
+`___TESTS___` content is a YAML document — `scenarios:`, a list of
+`{name, code}` entries, each `code` a `|-` literal block scalar (confirmed
+against a real working template: matomo-org/google-tag-manager-matomo-template).
+Ordinary JS with colons/object literals is fine *inside* a `code: |-` block
+(YAML treats block-scalar content as opaque text), but nothing outside one
+may contain a bare `identifier:` or it gets misread as a YAML mapping key —
+that includes an earlier `___SCENARIOS___` section (not a real section at
+all, removed) and, before this file matched the real format, plain
+top-level JS with `test()`/`mock()` calls. Each scenario is fully
+self-contained (its own `require()`s, its own mocks) since there's no
+shared preamble across list entries in this format.
+
+The test DSL's exact API (`mock`, `assertThat`, `runCode`, `Promise.create`)
+was written from memory, not validated against a live Template Editor —
+open this template there and run the Tests tab before trusting the suite
+green.

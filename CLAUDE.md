@@ -36,7 +36,7 @@ structure requirements.
   dropped because the correction call failed. Request timeout defaults to
   400ms since this sits in the hot path before every tag fires.
 - **Region must match the sGTM container's Cloud Run region.** The
-  ingestion endpoint is `https://{cloud-region}.utm-assistant.ai/inflight`
+  ingestion endpoint is `https://{cloud-region}.cr.utm-assistant.ai/inflight`
   — a per-account/property config field picks the region so the call stays
   in-region. See `README.md` for the full label → region-code table; a
   handful of entries were disambiguated from an initial source list and
@@ -45,7 +45,7 @@ structure requirements.
 
 ## Required permissions
 `read_event_data` and `write_event_data` scoped to the five `utm_*` keys,
-`send_http_request` scoped to `https://*.utm-assistant.ai/inflight*`,
+`send_http_request` scoped to `https://*.cr.utm-assistant.ai/inflight*`,
 `access_template_storage`, and `logging` (debug only). The permission JSON
 in `template.tpl` was hand-authored, not exported from the GTM Template
 Editor — treat it as a starting point and re-verify the Permissions tab in
