@@ -1,0 +1,6 @@
+# Community Template Gallery metadata.
+# Regenerate `sha256_hash` from the actual template.tpl contents using
+# Google's gallery submission tooling before any real gallery submission —
+# this is a placeholder until that step happens.
+name: inflight-utm-correction
+sha256_hash: PLACEHOLDER_REGENERATE_BEFORE_SUBMISSION
