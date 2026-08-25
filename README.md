@@ -132,6 +132,49 @@ against your actual GTM region picker before relying on them**:
 If any ⚠ default is wrong, it's a one-line edit to the `selectItems` array
 in `template.tpl`.
 
+## Finding your sGTM container's region
+
+How you check the region depends on whether your tagging server was set up
+via automatic or manual provisioning (Cloud Run / App Engine).
+
+### Method 1: Google Cloud Console (Cloud Run / App Engine)
+
+If you manage your own GCP infrastructure or used standard setup:
+
+1. Log into the [Google Cloud Console](https://console.cloud.google.com/).
+2. Select the GCP project associated with your sGTM deployment.
+3. Open **Cloud Run** from the main menu.
+4. Look at the **Region** column next to your sGTM services (e.g.
+   `us-central1`, `europe-west1`, `asia-northeast1`).
+
+(If your container predates late 2023 and uses App Engine instead of Cloud
+Run, go to **App Engine → Settings** to see the region instead.)
+
+### Method 2: Check the Cloud Run URL
+
+Every default Cloud Run service endpoint contains the deployment region
+directly inside its domain name:
+
+```
+https://gtm-xxxxxx-xxxx.<region>.run.app
+```
+
+Example: `https://gtm-abc123-xyz.europe-west1.run.app` → region is
+`europe-west1`.
+
+### Method 3: Inspect network response headers (quick check)
+
+If your sGTM container is attached to a custom domain (e.g.
+`metrics.yourdomain.com`):
+
+1. Open your website in a browser.
+2. Open Developer Tools (F12) → **Network** tab.
+3. Reload the page and select an incoming request sent to your sGTM domain.
+4. Check the response headers for Google Cloud routing headers — look for
+   `x-cloud-trace-context` or similar Google infrastructure headers, which
+   often include datacenter location codes (e.g. `fra` for Frankfurt, `iad`
+   for Iowa).
+
 ## Caching
 
 Corrections are cached per server instance, keyed on
