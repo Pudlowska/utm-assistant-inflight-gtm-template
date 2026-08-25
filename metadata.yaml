@@ -1,6 +1,5 @@
-# Community Template Gallery metadata.
-# Regenerate `sha256_hash` from the actual template.tpl contents using
-# Google's gallery submission tooling before any real gallery submission —
-# this is a placeholder until that step happens.
-name: inflight-utm-correction
-sha256_hash: PLACEHOLDER_REGENERATE_BEFORE_SUBMISSION
+homepage: https://www.utm-assistant.ai
+documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
+versions:
+  - sha: 9977b16940c51c5adeedf95bca5566f4103f4912
+    changeNotes: initial release
