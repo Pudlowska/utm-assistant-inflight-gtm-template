@@ -7,6 +7,57 @@ corrected values, and overwrites them via `setInEventData` before any Tag
 sees the event. Transformations only exist in server GTM containers — this
 template has no client-side/web-container equivalent.
 
+## Installation
+
+The `.tpl` imports as a **Variable Template** (its declared `type` is
+`MACRO`); it becomes an active Transformation by wiring that variable into
+sGTM's Transformations engine. Three steps:
+
+### Step 1: Import the Variable Template from the Gallery
+
+1. In your sGTM container, go to **Templates** in the left menu.
+2. Under **Variable Templates**, click **Search Gallery**.
+3. Search for **"Inflight - UTM Assistant – Real-Time UTM Correction"**.
+4. Click the template and select **Add to workspace**.
+5. Review the requested permissions (`read_event_data`, `write_event_data`,
+   `send_http_request`, `access_template_storage`, `logging`) and click
+   **Add**.
+
+### Step 2: Instantiate the Variable
+
+1. Go to **Variables** in the left menu.
+2. Under **User-Defined Variables**, click **New**.
+3. Open **Variable Configuration** and select the template under *Custom*.
+4. Fill in Property ID, API Key, Cloud Region, and the cache/timeout
+   options (see the field table below).
+5. Name the variable (e.g. `UTM - Real-Time Taxonomy Corrector`) and
+   **Save**.
+
+### Step 3: Attach it to the Transformations engine
+
+1. Go to **Transformations** in the left sidebar.
+2. Click **New** → choose **Augment Event** as the transformation type.
+3. Under **Field to Augment**, select or enter the target `utm_*`
+   parameters (or the broader event data scope).
+4. Under **Value**, select the variable instantiated in Step 2 (e.g.
+   `{{UTM - Real-Time Taxonomy Corrector}}`).
+5. Under **Matching Rules**, set the trigger condition to **All Events**
+   (or filter to specific incoming client requests).
+6. Name the transformation (e.g. `Transform - Real-Time UTM Taxonomy`) and
+   **Save**.
+
+### Data flow
+
+1. sGTM's Transformation engine catches the incoming request first.
+2. It executes the variable, which reads `getEventData()` and calls the
+   ingestion API via `sendHttpGet()` (through the cache first — see
+   "Caching" below).
+3. The variable calls `setInEventData()` to rewrite `utm_source`,
+   `utm_medium`, etc. with the corrected values.
+4. The transformation finishes, and every outgoing tag (GA4, Meta, Ads,
+   ...) reads the corrected UTMs from event data with no per-tag override
+   needed.
+
 ## Setup (per client property)
 
 | Field | Description |
