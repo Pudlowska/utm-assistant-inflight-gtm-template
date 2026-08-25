@@ -109,9 +109,9 @@ against your actual GTM region picker before relying on them**:
 | EU West (Belgium) | `europe-west1` | |
 | EU West (Germany) | `europe-west3` | ⚠ Source list said "EU Center (Germany)" — GCP's actual central-Europe region is Warsaw, not Germany. Frankfurt is `europe-west3`; relabeled. |
 | EU North (Finland) | `europe-north1` | |
-| EU North (Netherlands) | `europe-west4` | Unambiguous — only one Netherlands region exists. |
+| EU North (Netherlands) | `europe-west4` | |
 | EU East (Poland) | `europe-central2` | |
-| EU Center (France) | `europe-west9` | Unambiguous — only one France region exists, despite the code/label naming mismatch. |
+| EU Center (France) | `europe-west9` | |
 | EU South (Italy) | `europe-west8` | ⚠ Defaulted to Milan over Turin (`europe-west12`). |
 
 ### Middle East
