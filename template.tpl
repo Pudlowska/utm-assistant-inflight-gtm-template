@@ -217,7 +217,7 @@ function callIngestionApi(region, propertyId, apiKey, utms, timeoutMs) {
 function run() {
   const utms = readIncomingUtms();
   if (!utms) {
-    return undefined;
+    return utms;
   }
 
   const propertyId = resolvePropertyId();
@@ -375,7 +375,7 @@ ___SERVER_PERMISSIONS___
 ___TESTS___
 
 scenarios:
-- name: no utm params - resolves undefined and does not call the API
+- name: no utm params - resolves the incoming (empty) payload directly, does not call the API
   code: |-
     const Promise = require('Promise');
     mock('logToConsole', () => {});
@@ -393,7 +393,7 @@ scenarios:
     });
     const result = runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: true, cacheTtlSeconds: '21600', requestTimeoutMs: '400'});
     assertThat(httpCallCount).isEqualTo(0);
-    assertThat(result).isUndefined();
+    assertThat(result).isEqualTo(null);
 
 - name: cache disabled - resolves corrected values from a 200 response
   code: |-

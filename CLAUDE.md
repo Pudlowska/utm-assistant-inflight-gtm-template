@@ -50,7 +50,11 @@ breaking the gallery's structure requirements.
   mapped to a variable that resolves to `undefined` is liable to just not
   get set, silently dropping a parameter the tag would otherwise have
   sent. Request timeout defaults to 400ms since this sits in the hot path
-  before every tag fires.
+  before every tag fires. Separately, if the event has *no* utm_ keys at
+  all, that's not a failure — there's nothing to correct — so `run()`
+  short-circuits and resolves to whatever `readIncomingUtms()` returned
+  (`null`) directly, without calling the API. Extractor variables already
+  guard for this (`corrected ? corrected.utm_medium : undefined`).
 - **Return shape.** Resolves to a plain object containing only the utm_
   keys that were present on the incoming event (never invents a key that
   wasn't there), each set to the corrected value if the API provided one,
