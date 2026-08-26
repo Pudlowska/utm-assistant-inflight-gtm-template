@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 029e4461daf2c9bb870a09af7c5cfd2f79e67756
+    changeNotes: document Augment Event Transformation as the routing mechanism into destination tags, replacing per-field extractor variables
   - sha: 023cad4a25af6c010ebce17613ff24b5053acce4
     changeNotes: zero-utms case returns the incoming payload directly instead of a fabricated undefined
   - sha: 382e0c94315da01d647533a9c2edec54d8fa07c7
