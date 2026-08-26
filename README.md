@@ -88,14 +88,14 @@ variables still triggers only one ingestion API call per event, not five.
 
 ## Setup (per sGTM container)
 
-| Field | Description |
-|---|---|
-| Property ID override | Optional. Leave blank — see "Property resolution" below. Only set this for containers that receive non-GA4 traffic, or for testing. |
-| API Key | Issued per account from the Inflight dashboard. Sent as the `X-Api-Key` header. |
-| Cloud Region | Must match the Cloud Run region this sGTM container runs in. See table below. |
-| Cache corrections on this server instance | On by default. See "Caching" below. |
-| Cache TTL (seconds) | Default 21600 (6h). Lower if correction rulesets change often. |
-| Request timeout (ms) | Default 400. This call sits in the hot path before every tag fires — keep it tight. |
+| Field | Required / Default | Description |
+|---|---|---|
+| API Key | Required | Issued per account from the Inflight dashboard. Sent as the `X-Api-Key` header. |
+| Cloud Region | Required | Must match the Cloud Run region this sGTM container runs in. See table below. |
+| Property ID override | Optional — default: blank | Leave blank — see "Property resolution" below. Only set this for containers that receive non-GA4 traffic, or for testing. |
+| Cache corrections on this server instance | Optional — default: true | See "Caching" below. |
+| Cache TTL (seconds) | Optional — default: 21600 (6h) | Lower if correction rulesets change often. |
+| Request timeout (ms) | Optional — default: 400 | This call sits in the hot path before every tag fires — keep it tight. |
 
 ## Property resolution
 
