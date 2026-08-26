@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 9f5e0503a3bf53fd10d5a71430f2ba326080d4fe
+    changeNotes: declare write_event_data permission scoped to the utm_* keys
   - sha: 2c89141cc6b6c1e152642c29d8634ef67f221a77
     changeNotes: auto-detect property from x-ga-measurement_id instead of a required Property ID field
   - sha: 2d4a0867b92a8cc18c1d2589c386fd3bc2c9d5d6
