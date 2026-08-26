@@ -11,15 +11,20 @@ Don't add unrelated files here — anything that isn't the template risks
 breaking the gallery's structure requirements.
 
 ## Architecture — read this before touching the correction logic
-- **Custom Variable, server-side only, NOT a Transformation.** An earlier
-  version of this template (through 2026-08-26) was built as a
-  Transformation that called `setInEventData` directly — that does not
-  work for this template type and was scrapped. The current design is a
-  plain sGTM Custom Variable that resolves to a JSON object (see "Return
-  shape" below); routing that value into destination tags is the
-  container owner's job, done via each tag's Parameters/Fields to Set —
-  see `___NOTES___` in `template.tpl` for the exact setup, including the
-  companion per-field Custom JavaScript Variables this requires.
+- **Custom Variable that resolves a JSON object; the template itself
+  never writes event data.** An earlier version of this template (through
+  2026-08-26) was built as a Transformation that called `setInEventData`
+  directly from its own sandboxed JS — that does not work for this
+  template type and was scrapped. The current design is a plain sGTM
+  Custom Variable that resolves to a JSON object (see "Return shape"
+  below). Routing that value into destination tags is the container
+  owner's job, done via a native **Augment Event Transformation** that
+  maps each `utm_*` parameter to its property path on the resolved
+  object (e.g. `{{Inflight - Correction Data}}.utm_medium`) — GTM's own
+  built-in write mechanism, distinct from (and unaffected by) the
+  `setInEventData` limitation above. See `___NOTES___` in `template.tpl`
+  and the README's Installation section for the exact setup. No
+  per-field extractor variables or per-tag field mapping are needed.
 - **Async via a returned Promise, same as any sGTM variable.** Returning a
   `sendHttpGet(...).then(...)` chain tells sGTM to pause any tag this
   variable (or an extractor variable derived from it) is mapped into,
@@ -53,8 +58,10 @@ breaking the gallery's structure requirements.
   before every tag fires. Separately, if the event has *no* utm_ keys at
   all, that's not a failure — there's nothing to correct — so `run()`
   short-circuits and resolves to whatever `readIncomingUtms()` returned
-  (`null`) directly, without calling the API. Extractor variables already
-  guard for this (`corrected ? corrected.utm_medium : undefined`).
+  (`null`) directly, without calling the API. A property path on `null`
+  resolves to `undefined` in the Augment Event mapping, which the
+  Transformation treats as "leave this parameter alone" rather than
+  clearing it.
 - **Return shape.** Resolves to a plain object containing only the utm_
   keys that were present on the incoming event (never invents a key that
   wasn't there), each set to the corrected value if the API provided one,

@@ -5,19 +5,19 @@ incoming `utm_source` / `utm_medium` / `utm_campaign` / `utm_content` /
 `utm_term` event parameters, calls the Inflight ingestion API for the
 corrected values, and resolves to a JSON object of them — one call per
 event, corrected where possible, falling back to the original value
-otherwise. sGTM Custom Variables don't have a `setInEventData` equivalent,
-so routing that resolved value into your destination tags (GA4, Meta,
-Google Ads, ...) is done through each tag's own Parameters/Fields to Set —
-see Installation below. Server-side only; no client-side/web-container
-equivalent.
+otherwise. The template itself never writes event data (no
+`setInEventData` equivalent for this template type — an earlier version
+tried that and it does not work). Instead, routing the resolved values
+into event data is done with sGTM's native **Augment Event Transformation**,
+which reads properties straight off the resolved object — see Installation
+below. Server-side only; no client-side/web-container equivalent.
 
 ## Installation
 
 The `.tpl` imports as a **Variable Template** (its declared `type` is
-`MACRO`). Because a tag's Parameters/Fields to Set need a single string
-value per field, not a nested object, setup has one extra step beyond the
-usual "import a variable, use it in a tag": a small companion Custom
-JavaScript Variable per `utm_*` field you want corrected.
+`MACRO`). It resolves to a JSON object, not a single value, so it's routed
+into event data via a native **Augment Event Transformation** rather than
+being referenced directly in a tag field.
 
 ### Step 1: Import the Variable Template from the Gallery
 
@@ -39,52 +39,60 @@ JavaScript Variable per `utm_*` field you want corrected.
    "Property resolution" below.
 5. Name the variable (e.g. `Inflight - Correction Data`) and **Save**.
 
-### Step 3: Create one extractor variable per corrected field
+### Step 3: Create an Augment Event Transformation
 
-For each `utm_*` field you want corrected (you don't need all five), add a
-built-in **Custom JavaScript Variable**:
+This is a native sGTM feature — no companion template needed. It reads
+each field straight off the variable's resolved object and writes it into
+event data, before any tag evaluates it.
 
-1. Go to **Variables** → **New** → choose variable type **Custom
-   JavaScript**.
-2. Code, for example for `utm_medium`:
-   ```javascript
-   function() {
-     var corrected = {{Inflight - Correction Data}};
-     return corrected ? corrected.utm_medium : undefined;
-   }
-   ```
-3. Name it (e.g. `Inflight - utm_medium`) and **Save**. Repeat for each
-   other field, swapping the key name.
+1. In the sGTM left-hand menu, click **Transformations** → **New**.
+2. Choose **Augment Event** as the transformation type.
+3. Under **Parameters to Augment**, map each `utm_*` key you want
+   corrected to its property path on the resolved object:
 
-sGTM caches a variable's resolved value once per event — referencing
-`{{Inflight - Correction Data}}` from up to five of these extractor
-variables still triggers only one ingestion API call per event, not five.
+   | Parameter name | Value |
+   |---|---|
+   | `utm_source` | `{{Inflight - Correction Data}}.utm_source` |
+   | `utm_medium` | `{{Inflight - Correction Data}}.utm_medium` |
+   | `utm_campaign` | `{{Inflight - Correction Data}}.utm_campaign` |
+   | `utm_content` | `{{Inflight - Correction Data}}.utm_content` |
+   | `utm_term` | `{{Inflight - Correction Data}}.utm_term` |
 
-### Step 4: Map the extractor variables into your destination tags
+   You don't need all five rows — only include the fields you want
+   corrected. A path for a key that wasn't on the incoming event (and so
+   isn't in the resolved object) resolves to `undefined`; the
+   Transformation leaves that parameter alone rather than clearing it.
+4. Under **Matching Conditions**, set it to trigger on **All Events** (or
+   narrow it, e.g. to events where `utm_source` is populated).
+5. Under **Affected Tags**, leave it empty to apply globally to every tag,
+   or select specific destination tags (GA4, Meta, Google Ads, ...).
+6. Name it (e.g. `Transform - Inflight UTM Correction`) and **Save**.
 
-1. Open your GA4 Tag (or Meta, Google Ads, etc.) in sGTM.
-2. Go to **Parameters to Set** (or *Fields to Set* / *Event Parameters*).
-3. Set the parameter name to `utm_medium` (or whichever field), and its
-   value to the matching extractor variable from Step 3 (e.g.
-   `{{Inflight - utm_medium}}`).
-4. Repeat for each field. This mapping supersedes whatever value the tag
-   would otherwise have read from raw event data — no "priority" setting
-   needed.
+No per-field extractor variables and no per-tag Parameters/Fields to Set
+mapping are needed — every tag downstream of this Transformation reads the
+corrected `utm_*` values from event data automatically, the same way it
+would read any other event parameter.
 
 ### Data flow
 
-1. A destination tag fires and evaluates an extractor variable (e.g.
-   `{{Inflight - utm_medium}}`), which in turn evaluates
+1. An incoming event reaches the Transformation Engine. The
+   `Transform - Inflight UTM Correction` rule evaluates
    `{{Inflight - Correction Data}}`.
 2. That variable reads `getEventData()`, checks the cache (see "Caching"
    below), and on a cache miss calls the ingestion API via
    `sendHttpGet()`. Because it returns a Promise on that path, **sGTM
-   automatically pauses the tag** until the request resolves or times out
-   — no manual sequencing needed.
-3. The variable resolves to a JSON object; each extractor variable pulls
-   its one field out of it.
-4. The tag fires with the corrected (or, on any failure, the original)
-   `utm_*` values in the fields you mapped.
+   automatically pauses transformation processing** (and every tag it
+   feeds into) until the request resolves or times out — no manual
+   sequencing needed.
+3. The variable resolves to a JSON object; the Augment Event rule writes
+   each mapped `utm_*` path into event data, globally, in memory. This is
+   GTM's own native write mechanism for Augment Event — distinct from
+   (and unaffected by) the `setInEventData` limitation mentioned above,
+   which only applies to a template calling it directly from its own
+   sandboxed JS.
+4. Downstream tags fire and read the corrected (or, on any failure, the
+   original) `utm_*` values straight from event data, with no per-tag
+   configuration required.
 
 ## Setup (per sGTM container)
 

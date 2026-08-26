@@ -19,7 +19,7 @@ ___INFO___
     "displayName": "UTM Assistant",
     "thumbnail": ""
   },
-  "description": "Fetches corrected utm_source/utm_medium/utm_campaign/utm_content/utm_term values from the Inflight ingestion API for the current event, and resolves to a JSON object of them for use in destination tags' Parameters/Fields to Set (GA4, Meta, Google Ads, etc). Server-side only.",
+  "description": "Fetches corrected utm_source/utm_medium/utm_campaign/utm_content/utm_term values from the Inflight ingestion API for the current event, and resolves to a JSON object of them for use in a native Augment Event Transformation, which writes the corrected values into event data for all downstream tags (GA4, Meta, Google Ads, etc). Server-side only.",
   "containerContexts": [
     "SERVER"
   ]
@@ -659,22 +659,18 @@ Setup, per sGTM container:
    "Inflight - Correction Data"). Fill in API Key, Cloud Region, and the
    cache/timeout options. Leave "Property ID override" blank unless this
    container receives non-GA4 traffic — see "Property resolution" below.
-2. Since a destination tag's "Parameters/Fields to Set" expects a single
-   string per field, not a nested object, create one small built-in
-   **Custom JavaScript Variable** per utm_ key you want corrected, e.g. for
-   utm_medium:
-     function() {
-       var corrected = {{Inflight - Correction Data}};
-       return corrected ? corrected.utm_medium : undefined;
-     }
-   sGTM caches a variable's resolved value once per event, so referencing
-   "Inflight - Correction Data" from up to five of these extractor
-   variables still only triggers one API call per event, not five.
-3. In each destination tag (GA4, Meta, Google Ads, ...), under
-   Parameters/Fields to Set, map the field (e.g. `utm_medium`) to the
-   matching extractor variable from step 2. This supersedes whatever value
-   the tag would otherwise have read from raw event data — no "priority"
-   setting needed.
+2. Create a native **Augment Event Transformation** (Transformations ->
+   New -> Augment Event). Under Parameters to Augment, map each utm_ key
+   you want corrected to its property path on the resolved object, e.g.
+   `utm_medium` -> `{{Inflight - Correction Data}}.utm_medium`. Set
+   Matching Conditions to All Events (or narrower), and Affected Tags to
+   empty (applies globally) or a specific tag selection.
+   This is GTM's own write mechanism for Augment Event — it is not this
+   template calling setInEventData itself, which does not work. No
+   per-field extractor variables and no per-tag Parameters/Fields to Set
+   mapping are needed: every downstream tag reads the corrected utm_
+   values from event data automatically, same as any other event
+   parameter.
 
 Property resolution: the property is auto-detected per event from the GA4
 Client's `x-ga-measurement_id` (requires the `read_event_data` permission
@@ -700,6 +696,6 @@ a guarantee.
 
 Behavior on any failure (timeout, non-200, bad response body, no
 resolvable property id): fails open — resolves to the original,
-uncorrected utm_ values rather than undefined, so a tag field mapped to an
-extractor variable never silently drops a parameter it would otherwise
+uncorrected utm_ values rather than undefined, so the Augment Event
+Transformation never silently drops a parameter a tag would otherwise
 have sent.
