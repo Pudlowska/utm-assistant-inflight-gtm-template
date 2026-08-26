@@ -31,13 +31,10 @@ ___TEMPLATE_PARAMETERS___
 [
   {
     "type": "TEXT",
-    "name": "propertyId",
-    "displayName": "Property ID",
+    "name": "propertyIdOverride",
+    "displayName": "Property ID override (optional)",
     "simpleValueType": true,
-    "help": "The Inflight property identifier for this client property (matches the id used in the heuristic ruleset owned by utm-assistant-app). Scopes which correction rules the ingestion API applies.",
-    "valueValidators": [
-      { "type": "NON_EMPTY" }
-    ]
+    "help": "Leave blank in the normal case — the property is auto-detected per event from the GA4 Client's x-ga-measurement_id. Only set this for sGTM containers that receive non-GA4 traffic (no GA4 Client in the request path), or for testing."
   },
   {
     "type": "TEXT",
@@ -141,6 +138,16 @@ function readIncomingUtms() {
   return hasAny ? values : null;
 }
 
+// Auto-detected from the GA4 Client's parsed measurement ID unless a manual
+// override is set. Lets one Transformation instance cover every GA4 stream
+// in a shared sGTM container, instead of one instance per property.
+function resolvePropertyId() {
+  if (data.propertyIdOverride) {
+    return data.propertyIdOverride;
+  }
+  return getEventData('x-ga-measurement_id');
+}
+
 // Deliberately scoped to property + utm_ values only, not full event data —
 // this is meant to dedupe the SAME broken link across many different hits/visitors.
 function buildCacheKey(propertyId, utms) {
@@ -203,8 +210,14 @@ function runTransformation() {
     return;
   }
 
+  const propertyId = resolvePropertyId();
+  if (!propertyId) {
+    logToConsole('Inflight: no property id available (no x-ga-measurement_id on this event and no override set) — passing through uncorrected UTMs.');
+    return;
+  }
+
   const cacheEnabled = !!data.enableCache;
-  const cacheKey = cacheEnabled ? buildCacheKey(data.propertyId, utms) : null;
+  const cacheKey = cacheEnabled ? buildCacheKey(propertyId, utms) : null;
 
   if (cacheEnabled) {
     const cached = readCache(cacheKey, makeNumber(data.cacheTtlSeconds));
@@ -216,7 +229,7 @@ function runTransformation() {
 
   return callIngestionApi(
     data.cloudRegion,
-    data.propertyId,
+    propertyId,
     data.apiKey,
     utms,
     makeNumber(data.requestTimeoutMs)
@@ -301,11 +314,15 @@ ___SERVER_PERMISSIONS___
               },
               {
                 "type": 1,
+                "string": "utm_content"
+              },
+              {
+                "type": 1,
                 "string": "utm_term"
               },
               {
                 "type": 1,
-                "string": "utm_campaign"
+                "string": "x-ga-measurement_id"
               }
             ]
           }
@@ -369,7 +386,7 @@ scenarios:
       removeItem: () => {},
       clear: () => {}
     });
-    runCode({propertyId: 'demo-property', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: true, cacheTtlSeconds: '21600', requestTimeoutMs: '400'});
+    runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: true, cacheTtlSeconds: '21600', requestTimeoutMs: '400'});
     assertThat(httpCallCount).isEqualTo(0);
     assertThat(Object.keys(writes).length).isEqualTo(0);
 
@@ -378,7 +395,7 @@ scenarios:
     const Promise = require('Promise');
     const JSON = require('JSON');
     mock('logToConsole', () => {});
-    const eventValues = {utm_source: 'faceboook', utm_medium: 'social', utm_campaign: 'summer-sale'};
+    const eventValues = {utm_source: 'faceboook', utm_medium: 'social', utm_campaign: 'summer-sale', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
     const writes = {};
     mock('setInEventData', (key, value) => {
@@ -392,17 +409,17 @@ scenarios:
     });
     const correctedBody = JSON.stringify({utm_source: 'facebook', utm_medium: 'social', utm_campaign: 'summer-sale'});
     mock('sendHttpGet', () => Promise.create((resolve) => resolve({statusCode: 200, body: correctedBody})));
-    return runCode({propertyId: 'demo-property', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
+    return runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
       assertThat(writes.utm_source).isEqualTo('facebook');
       assertThat(writes.utm_medium).isEqualTo('social');
       assertThat(writes.utm_campaign).isEqualTo('summer-sale');
     });
 
-- name: request URL and headers are built from region, property id, and api key
+- name: request URL and headers are built from region, auto-detected property id, and api key
   code: |-
     const Promise = require('Promise');
     mock('logToConsole', () => {});
-    const eventValues = {utm_source: 'ig', utm_medium: 'paid'};
+    const eventValues = {utm_source: 'ig', utm_medium: 'paid', 'x-ga-measurement_id': 'G-PROP42'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
     mock('setInEventData', () => {});
     mock('templateDataStorage', {
@@ -418,19 +435,67 @@ scenarios:
       capturedOptions = options;
       return Promise.create((resolve) => resolve({statusCode: 200, body: '{}'}));
     });
-    return runCode({propertyId: 'prop-42', apiKey: 'demo-api-key', cloudRegion: 'europe-west1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
+    return runCode({apiKey: 'demo-api-key', cloudRegion: 'europe-west1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
       assertThat(capturedUrl.indexOf('https://europe-west1.cr.utm-assistant.ai/inflight?') === 0).isEqualTo(true);
-      assertThat(capturedUrl.indexOf('property_id=prop-42') > -1).isEqualTo(true);
+      assertThat(capturedUrl.indexOf('property_id=G-PROP42') > -1).isEqualTo(true);
       assertThat(capturedUrl.indexOf('utm_source=ig') > -1).isEqualTo(true);
       assertThat(capturedOptions.headers['X-Api-Key']).isEqualTo('demo-api-key');
     });
+
+- name: propertyIdOverride takes priority over the auto-detected measurement id
+  code: |-
+    const Promise = require('Promise');
+    mock('logToConsole', () => {});
+    const eventValues = {utm_source: 'ig', 'x-ga-measurement_id': 'G-FROMEVENT'};
+    mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
+    mock('setInEventData', () => {});
+    mock('templateDataStorage', {
+      getItemCopy: () => null,
+      setItemCopy: () => {},
+      removeItem: () => {},
+      clear: () => {}
+    });
+    let capturedUrl;
+    mock('sendHttpGet', (url) => {
+      capturedUrl = url;
+      return Promise.create((resolve) => resolve({statusCode: 200, body: '{}'}));
+    });
+    return runCode({propertyIdOverride: 'manual-override', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
+      assertThat(capturedUrl.indexOf('property_id=manual-override') > -1).isEqualTo(true);
+      assertThat(capturedUrl.indexOf('G-FROMEVENT') > -1).isEqualTo(false);
+    });
+
+- name: no property id resolvable - no measurement id and no override - fails open
+  code: |-
+    const Object = require('Object');
+    mock('logToConsole', () => {});
+    const eventValues = {utm_source: 'x'};
+    mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
+    const writes = {};
+    mock('setInEventData', (key, value) => {
+      writes[key] = value;
+    });
+    mock('templateDataStorage', {
+      getItemCopy: () => null,
+      setItemCopy: () => {},
+      removeItem: () => {},
+      clear: () => {}
+    });
+    let httpCallCount = 0;
+    mock('sendHttpGet', () => {
+      httpCallCount++;
+      return { then: () => {} };
+    });
+    runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'});
+    assertThat(httpCallCount).isEqualTo(0);
+    assertThat(Object.keys(writes).length).isEqualTo(0);
 
 - name: repeat identical hit is served from cache, not a second API call
   code: |-
     const Promise = require('Promise');
     const JSON = require('JSON');
     mock('logToConsole', () => {});
-    const eventValues = {utm_source: 'broken-source', utm_medium: 'cpc'};
+    const eventValues = {utm_source: 'broken-source', utm_medium: 'cpc', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
     const writes = {};
     mock('setInEventData', (key, value) => {
@@ -453,7 +518,7 @@ scenarios:
       httpCallCount++;
       return Promise.create((resolve) => resolve({statusCode: 200, body: correctedBody}));
     });
-    const fieldData = {propertyId: 'demo-property', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: true, cacheTtlSeconds: '21600', requestTimeoutMs: '400'};
+    const fieldData = {apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: true, cacheTtlSeconds: '21600', requestTimeoutMs: '400'};
     return runCode(fieldData)
       .then(() => runCode(fieldData))
       .then(() => {
@@ -466,7 +531,7 @@ scenarios:
     const Promise = require('Promise');
     const JSON = require('JSON');
     mock('logToConsole', () => {});
-    const eventValues = {utm_source: 'broken-source'};
+    const eventValues = {utm_source: 'broken-source', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
     mock('setInEventData', () => {});
     const store = {};
@@ -488,7 +553,7 @@ scenarios:
     });
     let now = 0;
     mock('getTimestampMillis', () => now);
-    const fieldData = {propertyId: 'demo-property', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: true, cacheTtlSeconds: '10', requestTimeoutMs: '400'};
+    const fieldData = {apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: true, cacheTtlSeconds: '10', requestTimeoutMs: '400'};
     return runCode(fieldData)
       .then(() => {
         now = 11 * 1000;
@@ -503,7 +568,7 @@ scenarios:
     const Promise = require('Promise');
     const Object = require('Object');
     mock('logToConsole', () => {});
-    const eventValues = {utm_source: 'x'};
+    const eventValues = {utm_source: 'x', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
     const writes = {};
     mock('setInEventData', (key, value) => {
@@ -516,7 +581,7 @@ scenarios:
       clear: () => {}
     });
     mock('sendHttpGet', () => Promise.create((resolve) => resolve({statusCode: 500, body: ''})));
-    return runCode({propertyId: 'demo-property', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
+    return runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
       assertThat(Object.keys(writes).length).isEqualTo(0);
     });
 
@@ -525,7 +590,7 @@ scenarios:
     const Promise = require('Promise');
     const Object = require('Object');
     mock('logToConsole', () => {});
-    const eventValues = {utm_source: 'x'};
+    const eventValues = {utm_source: 'x', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
     const writes = {};
     mock('setInEventData', (key, value) => {
@@ -538,7 +603,7 @@ scenarios:
       clear: () => {}
     });
     mock('sendHttpGet', () => Promise.create((resolve) => resolve({statusCode: 200, body: 'not json'})));
-    return runCode({propertyId: 'demo-property', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
+    return runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
       assertThat(Object.keys(writes).length).isEqualTo(0);
     });
 
@@ -547,7 +612,7 @@ scenarios:
     const Promise = require('Promise');
     const Object = require('Object');
     mock('logToConsole', () => {});
-    const eventValues = {utm_source: 'x'};
+    const eventValues = {utm_source: 'x', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
     const writes = {};
     mock('setInEventData', (key, value) => {
@@ -560,7 +625,7 @@ scenarios:
       clear: () => {}
     });
     mock('sendHttpGet', () => Promise.create((resolve, reject) => reject({reason: 'timeout'})));
-    return runCode({propertyId: 'demo-property', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
+    return runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
       assertThat(Object.keys(writes).length).isEqualTo(0);
     });
 
@@ -569,7 +634,7 @@ scenarios:
     const Promise = require('Promise');
     const JSON = require('JSON');
     mock('logToConsole', () => {});
-    const eventValues = {utm_source: 'x', utm_medium: 'y'};
+    const eventValues = {utm_source: 'x', utm_medium: 'y', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
     const writes = {};
     mock('setInEventData', (key, value) => {
@@ -583,7 +648,7 @@ scenarios:
     });
     const correctedBody = JSON.stringify({utm_source: 'x-fixed'});
     mock('sendHttpGet', () => Promise.create((resolve) => resolve({statusCode: 200, body: correctedBody})));
-    return runCode({propertyId: 'demo-property', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
+    return runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
       assertThat(writes.utm_source).isEqualTo('x-fixed');
       assertThat(writes.utm_medium).isUndefined();
     });
@@ -594,19 +659,25 @@ ___NOTES___
 Server-side Transformation only — Transformations don't run in web/client
 containers, so there's no client-side counterpart of this exact template.
 
-Setup, per client property:
-1. Property ID — the Inflight property identifier (see utm-assistant-app).
-2. API Key — issued per account from the Inflight dashboard.
+Setup, per sGTM container:
+1. Property ID — auto-detected per event from the GA4 Client's
+   `x-ga-measurement_id` (requires the `read_event_data` permission for
+   that key, declared in this template). One Transformation instance now
+   covers every GA4 property flowing through a shared container. Set the
+   "Property ID override" field only for non-GA4 traffic or testing.
+2. API Key — issued per account from the Inflight dashboard. On the
+   backend, an admin enables a given measurement ID under that API key
+   against a specific heuristic ruleset — see utm-assistant-app.
 3. Cloud Region — MUST match the Cloud Run region this sGTM container runs
    in. See this repo's README for the full label → region-code mapping and
    the handful of labels that had to be disambiguated from the source list
    (flagged there — verify against your actual GTM region picker).
 
 Before first use in a real container: open this template in the GTM
-Template Editor and re-verify the Permissions tab against the "Required
-permissions" list in the README. The permission JSON in this .tpl was
-hand-authored (not exported from the GTM UI) and may not match the exact
-schema GTM expects — treat it as a starting point, not a guarantee.
+Template Editor and re-verify the Permissions tab directly. The permission
+JSON in this .tpl was hand-authored (not exported from the GTM UI) and may
+not match the exact schema GTM expects — treat it as a starting point, not
+a guarantee.
 
 Behavior on any failure (timeout, non-200, bad response body): the
 transformation fails open — original utm_ values pass through unmodified,

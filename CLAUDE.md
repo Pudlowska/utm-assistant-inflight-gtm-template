@@ -43,19 +43,34 @@ structure requirements.
   should be double-checked against the actual GTM region picker before
   relying on them.
 
+## Property resolution — auto-detected, not configured
+As of 2026-08-26, the property is no longer a required config field. It's
+read per-event via `getEventData('x-ga-measurement_id')` — the GA4 Client
+populates this once it parses the incoming hit — so one Transformation
+instance now covers every GA4 property flowing through a shared sGTM
+container. `propertyIdOverride` (optional template field) takes priority
+over the auto-detected value, for non-GA4 traffic or testing. No property
+id resolvable (neither override nor `x-ga-measurement_id`) fails open
+immediately, without an API call.
+
 ## Required permissions
-`read_event_data` and `write_event_data` scoped to the five `utm_*` keys,
-`send_http_request` scoped to `https://*.cr.utm-assistant.ai/inflight*`,
-`access_template_storage`, and `logging` (debug only). The permission JSON
-in `template.tpl` was hand-authored, not exported from the GTM Template
-Editor — treat it as a starting point and re-verify the Permissions tab in
-the actual editor before first real use.
+`read_event_data` scoped to the five `utm_*` keys plus
+`x-ga-measurement_id`, `send_http_request` scoped to
+`https://*.cr.utm-assistant.ai/inflight*`, `access_template_storage`, and
+`logging` (debug only). **Known gap**: `template.tpl` does not currently
+declare a `write_event_data` permission block despite `setInEventData`
+being used in `applyCorrection` — unclear whether GTM enforces this at
+runtime for MACRO-type templates the way it does for Tags. Verify in the
+Permissions tab of a real GTM Template Editor before relying on it. The
+permission JSON in `template.tpl` was hand-authored, not exported from the
+GTM Template Editor — treat it as a starting point, not a guarantee.
 
 ## Consumes
 The heuristic JSON schema owned by `utm-assistant-app`. If that schema
-changes, this template's request/response handling needs to change with it.
-`propertyId` is expected to match the identifier format used by
-`utm-assistant-rt-function`'s ruleset API.
+changes, this template's request/response handling needs to change with
+it. The property identifier sent to the ingestion API is now a GA4
+measurement ID (`G-XXXXXXXXXX`) in the common case, not a slug typed into
+GTM — `utm-assistant-app`'s property lookup needs to key on that.
 
 ## Testing
 Use GTM's built-in template testing/preview mode before publishing a new
