@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 023cad4a25af6c010ebce17613ff24b5053acce4
+    changeNotes: zero-utms case returns the incoming payload directly instead of a fabricated undefined
   - sha: 382e0c94315da01d647533a9c2edec54d8fa07c7
     changeNotes: rebuild as a Custom Variable (MACRO) resolving a JSON object — setInEventData does not work for this template type
   - sha: 9f5e0503a3bf53fd10d5a71430f2ba326080d4fe
