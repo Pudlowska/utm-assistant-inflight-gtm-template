@@ -20,8 +20,9 @@ sGTM's Transformations engine. Three steps:
 3. Search for **"Inflight - UTM Assistant – Real-Time UTM Correction"**.
 4. Click the template and select **Add to workspace**.
 5. Review the requested permissions (`read_event_data` — scoped to the
-   `utm_*` keys plus `x-ga-measurement_id`, `send_http_request`,
-   `access_template_storage`, `logging`) and click **Add**.
+   `utm_*` keys plus `x-ga-measurement_id`, `write_event_data` — scoped to
+   the `utm_*` keys, `send_http_request`, `access_template_storage`,
+   `logging`) and click **Add**.
 
 ### Step 2: Instantiate the Variable
 

@@ -55,15 +55,13 @@ immediately, without an API call.
 
 ## Required permissions
 `read_event_data` scoped to the five `utm_*` keys plus
-`x-ga-measurement_id`, `send_http_request` scoped to
-`https://*.cr.utm-assistant.ai/inflight*`, `access_template_storage`, and
-`logging` (debug only). **Known gap**: `template.tpl` does not currently
-declare a `write_event_data` permission block despite `setInEventData`
-being used in `applyCorrection` — unclear whether GTM enforces this at
-runtime for MACRO-type templates the way it does for Tags. Verify in the
-Permissions tab of a real GTM Template Editor before relying on it. The
-permission JSON in `template.tpl` was hand-authored, not exported from the
-GTM Template Editor — treat it as a starting point, not a guarantee.
+`x-ga-measurement_id`, `write_event_data` scoped to the five `utm_*` keys
+(matches what `applyCorrection` actually writes via `setInEventData`),
+`send_http_request` scoped to `https://*.cr.utm-assistant.ai/inflight*`,
+`access_template_storage`, and `logging` (debug only). The permission JSON
+in `template.tpl` was hand-authored, not exported from the GTM Template
+Editor — treat it as a starting point and re-verify the Permissions tab in
+the actual editor before first real use.
 
 ## Consumes
 The heuristic JSON schema owned by `utm-assistant-app`. If that schema

@@ -344,6 +344,55 @@ ___SERVER_PERMISSIONS___
   {
     "instance": {
       "key": {
+        "publicId": "write_event_data",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "keyPatterns",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 1,
+                "string": "utm_source"
+              },
+              {
+                "type": 1,
+                "string": "utm_medium"
+              },
+              {
+                "type": 1,
+                "string": "utm_campaign"
+              },
+              {
+                "type": 1,
+                "string": "utm_content"
+              },
+              {
+                "type": 1,
+                "string": "utm_term"
+              }
+            ]
+          }
+        },
+        {
+          "key": "eventDataAccess",
+          "value": {
+            "type": 1,
+            "string": "specific"
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
         "publicId": "send_http",
         "versionId": "1"
       },
