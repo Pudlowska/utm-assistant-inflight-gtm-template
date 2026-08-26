@@ -19,17 +19,18 @@ sGTM's Transformations engine. Three steps:
 2. Under **Variable Templates**, click **Search Gallery**.
 3. Search for **"Inflight - UTM Assistant – Real-Time UTM Correction"**.
 4. Click the template and select **Add to workspace**.
-5. Review the requested permissions (`read_event_data`, `write_event_data`,
-   `send_http_request`, `access_template_storage`, `logging`) and click
-   **Add**.
+5. Review the requested permissions (`read_event_data` — scoped to the
+   `utm_*` keys plus `x-ga-measurement_id`, `send_http_request`,
+   `access_template_storage`, `logging`) and click **Add**.
 
 ### Step 2: Instantiate the Variable
 
 1. Go to **Variables** in the left menu.
 2. Under **User-Defined Variables**, click **New**.
 3. Open **Variable Configuration** and select the template under *Custom*.
-4. Fill in Property ID, API Key, Cloud Region, and the cache/timeout
-   options (see the field table below).
+4. Fill in API Key, Cloud Region, and the cache/timeout options (see the
+   field table below). Leave **Property ID override** blank — see
+   "Property resolution" below.
 5. Name the variable (e.g. `UTM - Real-Time Taxonomy Corrector`) and
    **Save**.
 
@@ -58,16 +59,36 @@ sGTM's Transformations engine. Three steps:
    ...) reads the corrected UTMs from event data with no per-tag override
    needed.
 
-## Setup (per client property)
+## Setup (per sGTM container)
 
 | Field | Description |
 |---|---|
-| Property ID | Inflight property identifier for this client property (owned by `utm-assistant-app`'s heuristic schema). |
+| Property ID override | Optional. Leave blank — see "Property resolution" below. Only set this for containers that receive non-GA4 traffic, or for testing. |
 | API Key | Issued per account from the Inflight dashboard. Sent as the `X-Api-Key` header. |
 | Cloud Region | Must match the Cloud Run region this sGTM container runs in. See table below. |
 | Cache corrections on this server instance | On by default. See "Caching" below. |
 | Cache TTL (seconds) | Default 21600 (6h). Lower if correction rulesets change often. |
 | Request timeout (ms) | Default 400. This call sits in the hot path before every tag fires — keep it tight. |
+
+## Property resolution
+
+The property is auto-detected per event, not typed into the template. The
+GA4 Client populates `x-ga-measurement_id` in event data once it parses an
+incoming hit; this template reads it via `getEventData('x-ga-measurement_id')`
+and sends it as `property_id` to the ingestion API. On the backend, an
+account admin links a given measurement ID to a heuristic ruleset under
+their API key — see `utm-assistant-app`.
+
+This means **one Transformation instance covers every GA4 property** routed
+through a shared sGTM container — no per-property variable instances or
+manual property ID entry needed.
+
+If **Property ID override** is set, it always takes priority over the
+auto-detected measurement ID. Use it for sGTM containers that receive
+non-GA4 traffic (no GA4 Client in the request path, so
+`x-ga-measurement_id` is never populated), or while testing. If neither the
+override nor `x-ga-measurement_id` is available on an event, the
+transformation fails open immediately without calling the ingestion API.
 
 ## Endpoint
 
@@ -75,6 +96,11 @@ sGTM's Transformations engine. Three steps:
 GET https://{cloud-region}.cr.utm-assistant.ai/inflight?property_id=...&utm_source=...&utm_medium=...&utm_campaign=...&utm_content=...&utm_term=...
 X-Api-Key: {apiKey}
 ```
+
+`property_id` is the auto-detected GA4 measurement ID (`G-XXXXXXXXXX`) in
+the common case, or the **Property ID override** value if one is set — see
+"Property resolution" above. Either way it arrives as a plain string; the
+ingestion API doesn't need to know which source it came from.
 
 Expects a `200` JSON response with any subset of the five `utm_*` keys —
 only keys present in the response are written back via `setInEventData`.
