@@ -1,17 +1,23 @@
-# Inflight — Real-Time UTM Correction (sGTM Transformation)
+# Inflight — Real-Time UTM Correction (sGTM Custom Variable)
 
-A Google Tag Manager **server-side Transformation** template. It reads the
+A Google Tag Manager **server-side Custom Variable** template. It reads the
 incoming `utm_source` / `utm_medium` / `utm_campaign` / `utm_content` /
 `utm_term` event parameters, calls the Inflight ingestion API for the
-corrected values, and overwrites them via `setInEventData` before any Tag
-sees the event. Transformations only exist in server GTM containers — this
-template has no client-side/web-container equivalent.
+corrected values, and resolves to a JSON object of them — one call per
+event, corrected where possible, falling back to the original value
+otherwise. sGTM Custom Variables don't have a `setInEventData` equivalent,
+so routing that resolved value into your destination tags (GA4, Meta,
+Google Ads, ...) is done through each tag's own Parameters/Fields to Set —
+see Installation below. Server-side only; no client-side/web-container
+equivalent.
 
 ## Installation
 
 The `.tpl` imports as a **Variable Template** (its declared `type` is
-`MACRO`); it becomes an active Transformation by wiring that variable into
-sGTM's Transformations engine. Three steps:
+`MACRO`). Because a tag's Parameters/Fields to Set need a single string
+value per field, not a nested object, setup has one extra step beyond the
+usual "import a variable, use it in a tag": a small companion Custom
+JavaScript Variable per `utm_*` field you want corrected.
 
 ### Step 1: Import the Variable Template from the Gallery
 
@@ -20,9 +26,8 @@ sGTM's Transformations engine. Three steps:
 3. Search for **"Inflight - UTM Assistant – Real-Time UTM Correction"**.
 4. Click the template and select **Add to workspace**.
 5. Review the requested permissions (`read_event_data` — scoped to the
-   `utm_*` keys plus `x-ga-measurement_id`, `write_event_data` — scoped to
-   the `utm_*` keys, `send_http_request`, `access_template_storage`,
-   `logging`) and click **Add**.
+   `utm_*` keys plus `x-ga-measurement_id`, `send_http_request`,
+   `access_template_storage`, `logging`) and click **Add**.
 
 ### Step 2: Instantiate the Variable
 
@@ -32,33 +37,54 @@ sGTM's Transformations engine. Three steps:
 4. Fill in API Key, Cloud Region, and the cache/timeout options (see the
    field table below). Leave **Property ID override** blank — see
    "Property resolution" below.
-5. Name the variable (e.g. `UTM - Real-Time Taxonomy Corrector`) and
-   **Save**.
+5. Name the variable (e.g. `Inflight - Correction Data`) and **Save**.
 
-### Step 3: Attach it to the Transformations engine
+### Step 3: Create one extractor variable per corrected field
 
-1. Go to **Transformations** in the left sidebar.
-2. Click **New** → choose **Augment Event** as the transformation type.
-3. Under **Field to Augment**, select or enter the target `utm_*`
-   parameters (or the broader event data scope).
-4. Under **Value**, select the variable instantiated in Step 2 (e.g.
-   `{{UTM - Real-Time Taxonomy Corrector}}`).
-5. Under **Matching Rules**, set the trigger condition to **All Events**
-   (or filter to specific incoming client requests).
-6. Name the transformation (e.g. `Transform - Real-Time UTM Taxonomy`) and
-   **Save**.
+For each `utm_*` field you want corrected (you don't need all five), add a
+built-in **Custom JavaScript Variable**:
+
+1. Go to **Variables** → **New** → choose variable type **Custom
+   JavaScript**.
+2. Code, for example for `utm_medium`:
+   ```javascript
+   function() {
+     var corrected = {{Inflight - Correction Data}};
+     return corrected ? corrected.utm_medium : undefined;
+   }
+   ```
+3. Name it (e.g. `Inflight - utm_medium`) and **Save**. Repeat for each
+   other field, swapping the key name.
+
+sGTM caches a variable's resolved value once per event — referencing
+`{{Inflight - Correction Data}}` from up to five of these extractor
+variables still triggers only one ingestion API call per event, not five.
+
+### Step 4: Map the extractor variables into your destination tags
+
+1. Open your GA4 Tag (or Meta, Google Ads, etc.) in sGTM.
+2. Go to **Parameters to Set** (or *Fields to Set* / *Event Parameters*).
+3. Set the parameter name to `utm_medium` (or whichever field), and its
+   value to the matching extractor variable from Step 3 (e.g.
+   `{{Inflight - utm_medium}}`).
+4. Repeat for each field. This mapping supersedes whatever value the tag
+   would otherwise have read from raw event data — no "priority" setting
+   needed.
 
 ### Data flow
 
-1. sGTM's Transformation engine catches the incoming request first.
-2. It executes the variable, which reads `getEventData()` and calls the
-   ingestion API via `sendHttpGet()` (through the cache first — see
-   "Caching" below).
-3. The variable calls `setInEventData()` to rewrite `utm_source`,
-   `utm_medium`, etc. with the corrected values.
-4. The transformation finishes, and every outgoing tag (GA4, Meta, Ads,
-   ...) reads the corrected UTMs from event data with no per-tag override
-   needed.
+1. A destination tag fires and evaluates an extractor variable (e.g.
+   `{{Inflight - utm_medium}}`), which in turn evaluates
+   `{{Inflight - Correction Data}}`.
+2. That variable reads `getEventData()`, checks the cache (see "Caching"
+   below), and on a cache miss calls the ingestion API via
+   `sendHttpGet()`. Because it returns a Promise on that path, **sGTM
+   automatically pauses the tag** until the request resolves or times out
+   — no manual sequencing needed.
+3. The variable resolves to a JSON object; each extractor variable pulls
+   its one field out of it.
+4. The tag fires with the corrected (or, on any failure, the original)
+   `utm_*` values in the fields you mapped.
 
 ## Setup (per sGTM container)
 
@@ -80,7 +106,7 @@ and sends it as `property_id` to the ingestion API. On the backend, an
 account admin links a given measurement ID to a heuristic ruleset under
 their API key — see `utm-assistant-app`.
 
-This means **one Transformation instance covers every GA4 property** routed
+This means **one variable instance covers every GA4 property** routed
 through a shared sGTM container — no per-property variable instances or
 manual property ID entry needed.
 
@@ -88,8 +114,9 @@ If **Property ID override** is set, it always takes priority over the
 auto-detected measurement ID. Use it for sGTM containers that receive
 non-GA4 traffic (no GA4 Client in the request path, so
 `x-ga-measurement_id` is never populated), or while testing. If neither the
-override nor `x-ga-measurement_id` is available on an event, the
-transformation fails open immediately without calling the ingestion API.
+override nor `x-ga-measurement_id` is available on an event, the variable
+fails open immediately without calling the ingestion API — it resolves to
+the raw, uncorrected `utm_*` values instead.
 
 ## Endpoint
 
@@ -104,9 +131,12 @@ the common case, or the **Property ID override** value if one is set — see
 ingestion API doesn't need to know which source it came from.
 
 Expects a `200` JSON response with any subset of the five `utm_*` keys —
-only keys present in the response are written back via `setInEventData`.
-Any other status, a timeout, or an unparseable body leaves the original
-values untouched (fail open — this never blocks or drops the event).
+only keys present on the incoming event are included in the variable's
+resolved object, and only the ones the response actually corrects get
+overridden there; the rest fall back to their raw incoming value. Any
+other status, a timeout, or an unparseable body leaves every key at its
+raw value (fail open — this never blocks a tag or drops a parameter it
+would otherwise have sent).
 
 ## Cloud Region mapping
 
