@@ -19,7 +19,7 @@ ___INFO___
     "displayName": "UTM Assistant",
     "thumbnail": ""
   },
-  "description": "Fetches corrected utm_source/utm_medium/utm_campaign/utm_content/utm_term values from the Inflight ingestion API for the current event, and resolves to a JSON object of them for use in a native Augment Event Transformation, which writes the corrected values into event data for all downstream tags (GA4, Meta, Google Ads, etc). Server-side only.",
+  "description": "Fetches corrected utm_id/utm_source/utm_medium/utm_campaign/utm_source_platform/utm_term/utm_content values from the Inflight ingestion API for the current event, and resolves to a JSON object of them for use in a native Augment Event Transformation, which writes the corrected values into event data for all downstream tags (GA4, Meta, Google Ads, etc). Server-side only.",
   "containerContexts": [
     "SERVER"
   ]
@@ -52,28 +52,14 @@ ___TEMPLATE_PARAMETERS___
     "displayName": "Cloud Region",
     "macrosInSelect": false,
     "selectItems": [
-      { "value": "southamerica-west1", "displayValue": "SA West (Chile)" },
-      { "value": "asia-northeast1", "displayValue": "JP Center (Japan)" },
-      { "value": "me-central1", "displayValue": "ME Center (Qatar)" },
-      { "value": "northamerica-northeast1", "displayValue": "CA East (Canada)" },
       { "value": "us-central1", "displayValue": "US Center (Iowa)" },
-      { "value": "us-east1", "displayValue": "US East (South Carolina)" },
       { "value": "us-west1", "displayValue": "US West (Oregon)" },
-      { "value": "europe-west2", "displayValue": "EU West (England)" },
-      { "value": "europe-west1", "displayValue": "EU West (Belgium)" },
       { "value": "europe-west3", "displayValue": "EU West (Germany)" },
       { "value": "europe-north1", "displayValue": "EU North (Finland)" },
-      { "value": "asia-south1", "displayValue": "AP South (India)" },
-      { "value": "australia-southeast1", "displayValue": "AU East (Australia)" },
-      { "value": "southamerica-east1", "displayValue": "SA East (Brazil)" },
-      { "value": "asia-southeast1", "displayValue": "AP East (Singapore)" },
-      { "value": "europe-central2", "displayValue": "EU East (Poland)" },
-      { "value": "europe-west9", "displayValue": "EU Center (France)" },
-      { "value": "europe-west4", "displayValue": "EU North (Netherlands)" },
-      { "value": "europe-west8", "displayValue": "EU South (Italy)" }
+      { "value": "europe-central2", "displayValue": "EU East (Poland)" }
     ],
     "simpleValueType": true,
-    "help": "Must match the Cloud Run region this sGTM container runs in — a mismatched region adds cross-region latency and defeats the point of this setting. See this repo's README for the full mapping and a few labels that were disambiguated from the source list.",
+    "help": "Must match the Cloud Run region this sGTM container runs in — a mismatched region adds cross-region latency and defeats the point of this setting. Only these 5 of the ingestion API's eventual 19 regions are live today; the rest are blocked on a pending Cloud Run region-count quota increase and will be added back to this list once that clears — see this repo's README's \"Cloud Region mapping\" section for the full target list and current status per region.",
     "valueValidators": [
       { "type": "NON_EMPTY" }
     ]
@@ -120,7 +106,13 @@ const getTimestampMillis = require('getTimestampMillis');
 const JSON = require('JSON');
 const makeNumber = require('makeNumber');
 
-const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+// Mirrors utm-assistant-app/packages/heuristic-engine/src/types.ts's
+// UTM_KEYS by hand (GTM sandboxed JS can't import an npm package) — the
+// full set GA4 reports on, minus utm_creative_format/utm_marketing_tactic
+// (GA4 accepts but doesn't report on either, so there's nothing to
+// correct against). Keep this, read_event_data's keyPatterns below, and
+// that file's UTM_KEYS in sync.
+const UTM_KEYS = ['utm_id', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_source_platform', 'utm_term', 'utm_content'];
 
 // Only the utm_ keys actually present on this event — nothing to correct if none are set.
 function readIncomingUtms() {
@@ -312,6 +304,10 @@ ___SERVER_PERMISSIONS___
             "listItem": [
               {
                 "type": 1,
+                "string": "utm_id"
+              },
+              {
+                "type": 1,
                 "string": "utm_source"
               },
               {
@@ -324,11 +320,15 @@ ___SERVER_PERMISSIONS___
               },
               {
                 "type": 1,
-                "string": "utm_content"
+                "string": "utm_source_platform"
               },
               {
                 "type": 1,
                 "string": "utm_term"
+              },
+              {
+                "type": 1,
+                "string": "utm_content"
               },
               {
                 "type": 1,

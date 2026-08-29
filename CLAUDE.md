@@ -41,8 +41,8 @@ breaking the gallery's structure requirements.
   architecture, now being built.
 - **Hash-keyed cache, TTL-checked manually.** Before calling the API, checks
   `templateDataStorage` for a cached correction keyed on
-  `sha256(propertyId + utm_source + utm_medium + utm_campaign + utm_content
-  + utm_term)`. This targets the dominant real-world case — one broken
+  `sha256(propertyId + <all 7 utm_* values in UTM_KEYS order>)`. This
+  targets the dominant real-world case — one broken
   link/ad generating many identical hits from different visitors — not
   per-visitor session caching. `templateDataStorage` is per server instance
   only, not shared across instances; a real shared cache (Firestore/Redis)
@@ -85,14 +85,30 @@ resolvable (neither override nor `x-ga-measurement_id`) fails open
 immediately, without an API call — resolves to the raw utms unchanged.
 
 ## Required permissions
-`read_event_data` scoped to the five `utm_*` keys plus
-`x-ga-measurement_id`, `send_http_request` scoped to
+`read_event_data` scoped to the seven `utm_*` keys (`utm_id`, `utm_source`,
+`utm_medium`, `utm_campaign`, `utm_source_platform`, `utm_term`,
+`utm_content` — GA4's full reported set per Google's URL builder doc,
+minus `utm_creative_format`/`utm_marketing_tactic`, which GA4 doesn't
+report on) plus `x-ga-measurement_id`, `send_http_request` scoped to
 `https://*.cr.utm-assistant.ai/inflight*`, `access_template_storage`, and
 `logging` (debug only). No `write_event_data` — this template no longer
 writes event data at all; it only resolves to a value. The permission JSON
 in `template.tpl` was hand-authored, not exported from the GTM Template
 Editor — treat it as a starting point and re-verify the Permissions tab in
 the actual editor before first real use.
+
+## Region availability — only 5 of 19 selectable today
+The Cloud Region dropdown currently lists only `us-central1`, `us-west1`,
+`europe-west3`, `europe-north1`, and `europe-central2` — the only regions
+`utm-assistant-cr-inflight`'s load balancer actually routes to right now.
+The other 14 are blocked on a pending Cloud Run region-count quota
+increase (GCP case `622fd189-13ec-4c20-810d-03eef3b987f5`, filed
+2026-08-29, Google's own ETA 2-3 weeks) — see that repo's
+`infra/variables.tf` `active_regions` comment. Once the quota clears and
+that repo's load balancer is re-applied against the full region list,
+add the remaining 14 entries back to `cloudRegion`'s `selectItems` here
+(full list + labels in this repo's README's "Cloud Region mapping"
+section, which was deliberately left un-trimmed as the target list).
 
 ## Consumes
 The heuristic JSON schema owned by `utm-assistant-app`. If that schema

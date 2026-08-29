@@ -1,8 +1,11 @@
 # Inflight — Real-Time UTM Correction (sGTM Custom Variable)
 
 A Google Tag Manager **server-side Custom Variable** template. It reads the
-incoming `utm_source` / `utm_medium` / `utm_campaign` / `utm_content` /
-`utm_term` event parameters, calls the Inflight ingestion API for the
+incoming `utm_id` / `utm_source` / `utm_medium` / `utm_campaign` /
+`utm_source_platform` / `utm_term` / `utm_content` event parameters — GA4's
+full reported set per Google's own Analytics Help Center URL-builder
+documentation, minus `utm_creative_format`/`utm_marketing_tactic`, which
+GA4 accepts but doesn't report on — calls the Inflight ingestion API for the
 corrected values, and resolves to a JSON object of them — one call per
 event, corrected where possible, falling back to the original value
 otherwise. The template itself never writes event data (no
@@ -25,7 +28,7 @@ being referenced directly in a tag field.
 2. Under **Variable Templates**, click **Search Gallery**.
 3. Search for **"Inflight - UTM Assistant – Real-Time UTM Correction"**.
 4. Click the template and select **Add to workspace**.
-5. Review the requested permissions (`read_event_data` — scoped to the
+5. Review the requested permissions (`read_event_data` — scoped to the 7
    `utm_*` keys plus `x-ga-measurement_id`, `send_http_request`,
    `access_template_storage`, `logging`) and click **Add**.
 
@@ -52,13 +55,15 @@ event data, before any tag evaluates it.
 
    | Parameter name | Value |
    |---|---|
+   | `utm_id` | `{{Inflight - Correction Data}}.utm_id` |
    | `utm_source` | `{{Inflight - Correction Data}}.utm_source` |
    | `utm_medium` | `{{Inflight - Correction Data}}.utm_medium` |
    | `utm_campaign` | `{{Inflight - Correction Data}}.utm_campaign` |
-   | `utm_content` | `{{Inflight - Correction Data}}.utm_content` |
+   | `utm_source_platform` | `{{Inflight - Correction Data}}.utm_source_platform` |
    | `utm_term` | `{{Inflight - Correction Data}}.utm_term` |
+   | `utm_content` | `{{Inflight - Correction Data}}.utm_content` |
 
-   You don't need all five rows — only include the fields you want
+   You don't need all seven rows — only include the fields you want
    corrected. A path for a key that wasn't on the incoming event (and so
    isn't in the resolved object) resolves to `undefined`; the
    Transformation leaves that parameter alone rather than clearing it.
@@ -129,7 +134,7 @@ the raw, uncorrected `utm_*` values instead.
 ## Endpoint
 
 ```
-GET https://{cloud-region}.cr.utm-assistant.ai/inflight?property_id=...&utm_source=...&utm_medium=...&utm_campaign=...&utm_content=...&utm_term=...
+GET https://{cloud-region}.cr.utm-assistant.ai/inflight?property_id=...&utm_id=...&utm_source=...&utm_medium=...&utm_campaign=...&utm_source_platform=...&utm_term=...&utm_content=...
 X-Api-Key: {apiKey}
 ```
 
@@ -153,49 +158,63 @@ original source list; the underlying `value` is the real Cloud Run region
 code used in the endpoint subdomain. Cross-checked against Google's current
 Cloud Run region list. Most resolve unambiguously (only one region exists
 in that country); a handful didn't and were disambiguated — **verify these
-against your actual GTM region picker before relying on them**:
+against your actual GTM region picker before relying on them**.
+
+**Region availability: only 5 of these 19 are selectable in the dropdown
+today.** `utm-assistant-cr-inflight`'s load balancer currently only routes
+to `us-central1`, `us-west1`, `europe-west3`, `europe-north1`, and
+`europe-central2` — the rest are blocked on a pending Cloud Run
+region-count quota increase (GCP case
+`622fd189-13ec-4c20-810d-03eef3b987f5`, filed 2026-08-29, Google's own ETA
+2-3 weeks). The tables below list the full 19-region target — kept as
+reference (including the disambiguation notes, still relevant once a
+region goes live) rather than trimmed down — with a **Status** column
+marking what's actually usable right now. A region marked "Pending quota"
+isn't in the dropdown yet; selecting it isn't possible until it's added
+back once the quota clears.
 
 ### Americas
 
-| Display label | Region code | Note |
-|---|---|---|
-| CA East (Canada) | `northamerica-northeast1` | ⚠ Defaulted to Montreal over Toronto (`northamerica-northeast2`). |
-| US Center (Iowa) | `us-central1` | |
-| US East (South Carolina) | `us-east1` | |
-| US West (Oregon) | `us-west1` | |
-| SA East (Brazil) | `southamerica-east1` | |
-| SA West (Chile) | `southamerica-west1` | |
+| Display label | Region code | Status | Note |
+|---|---|---|---|
+| CA East (Canada) | `northamerica-northeast1` | Pending quota | ⚠ Defaulted to Montreal over Toronto (`northamerica-northeast2`). |
+| US Center (Iowa) | `us-central1` | **Live** | |
+| US East (South Carolina) | `us-east1` | Pending quota | |
+| US West (Oregon) | `us-west1` | **Live** | |
+| SA East (Brazil) | `southamerica-east1` | Pending quota | |
+| SA West (Chile) | `southamerica-west1` | Pending quota | |
 
 ### Europe
 
-| Display label | Region code | Note |
-|---|---|---|
-| EU West (England) | `europe-west2` | ⚠ Source list said "EU North (England)" — no Cloud Run region matches north+England. London is `europe-west2`; relabeled. |
-| EU West (Belgium) | `europe-west1` | |
-| EU West (Germany) | `europe-west3` | ⚠ Source list said "EU Center (Germany)" — GCP's actual central-Europe region is Warsaw, not Germany. Frankfurt is `europe-west3`; relabeled. |
-| EU North (Finland) | `europe-north1` | |
-| EU North (Netherlands) | `europe-west4` | |
-| EU East (Poland) | `europe-central2` | |
-| EU Center (France) | `europe-west9` | |
-| EU South (Italy) | `europe-west8` | ⚠ Defaulted to Milan over Turin (`europe-west12`). |
+| Display label | Region code | Status | Note |
+|---|---|---|---|
+| EU West (England) | `europe-west2` | Pending quota | ⚠ Source list said "EU North (England)" — no Cloud Run region matches north+England. London is `europe-west2`; relabeled. |
+| EU West (Belgium) | `europe-west1` | Pending quota | |
+| EU West (Germany) | `europe-west3` | **Live** | ⚠ Source list said "EU Center (Germany)" — GCP's actual central-Europe region is Warsaw, not Germany. Frankfurt is `europe-west3`; relabeled. |
+| EU North (Finland) | `europe-north1` | **Live** | |
+| EU North (Netherlands) | `europe-west4` | Pending quota | |
+| EU East (Poland) | `europe-central2` | **Live** | |
+| EU Center (France) | `europe-west9` | Pending quota | |
+| EU South (Italy) | `europe-west8` | Pending quota | ⚠ Defaulted to Milan over Turin (`europe-west12`). |
 
 ### Middle East
 
-| Display label | Region code | Note |
-|---|---|---|
-| ME Center (Qatar) | `me-central1` | |
+| Display label | Region code | Status | Note |
+|---|---|---|---|
+| ME Center (Qatar) | `me-central1` | Pending quota | |
 
 ### Asia-Pacific
 
-| Display label | Region code | Note |
-|---|---|---|
-| JP Center (Japan) | `asia-northeast1` | ⚠ Defaulted to Tokyo over Osaka (`asia-northeast2`) — no region is officially "center". |
-| AP South (India) | `asia-south1` | ⚠ Defaulted to Mumbai over Delhi (`asia-south2`). |
-| AP East (Singapore) | `asia-southeast1` | |
-| AU East (Australia) | `australia-southeast1` | ⚠ Defaulted to Sydney over Melbourne (`australia-southeast2`). |
+| Display label | Region code | Status | Note |
+|---|---|---|---|
+| JP Center (Japan) | `asia-northeast1` | Pending quota | ⚠ Defaulted to Tokyo over Osaka (`asia-northeast2`) — no region is officially "center". |
+| AP South (India) | `asia-south1` | Pending quota | ⚠ Defaulted to Mumbai over Delhi (`asia-south2`). |
+| AP East (Singapore) | `asia-southeast1` | Pending quota | |
+| AU East (Australia) | `australia-southeast1` | Pending quota | ⚠ Defaulted to Sydney over Melbourne (`australia-southeast2`). |
 
 If any ⚠ default is wrong, it's a one-line edit to the `selectItems` array
-in `template.tpl`.
+in `template.tpl` (for a **Live** region only — a **Pending quota** region
+isn't in `selectItems` at all right now, see above).
 
 ## Finding your sGTM container's region
 
@@ -243,8 +262,8 @@ If your sGTM container is attached to a custom domain (e.g.
 ## Caching
 
 Corrections are cached per server instance, keyed on
-`sha256(propertyId + utm_source + utm_medium + utm_campaign + utm_content +
-utm_term)` via `templateDataStorage`, with a manually-checked TTL (no native
+`sha256(propertyId + <all 7 utm_* values, in the same order as UTM_KEYS in
+template.tpl>)` via `templateDataStorage`, with a manually-checked TTL (no native
 expiry in that API). This targets the common real-world case — one broken
 link or ad generating many identical hits from different visitors — rather
 than per-visitor session caching. It's per-instance only, not shared across
