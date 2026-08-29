@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 929c289f33192f8033c20f4e4113ff45eb97e315
+    changeNotes: read utm_id/utm_source_platform (GA4's full reported UTM set) alongside the original 5; Cloud Region dropdown restricted to the 5 regions currently live
   - sha: 029e4461daf2c9bb870a09af7c5cfd2f79e67756
     changeNotes: document Augment Event Transformation as the routing mechanism into destination tags, replacing per-field extractor variables
   - sha: 023cad4a25af6c010ebce17613ff24b5053acce4
