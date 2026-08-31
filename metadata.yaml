@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 07b7bcc53771beb8b830bd65171cc82c6c34f0d5
+    changeNotes: Guard JSON.parse with a shape check -- confirmed live it throws on invalid input, contrary to documented behavior, and try/catch is unavailable
   - sha: efbf3d4b0439e9afd6632f16654b56cce7ebebeb
     changeNotes: Drop manual templateDataStorage mock from the two multi-runCode() cache tests -- experiment to fix a live TypeError
   - sha: d2724e013d026a49359ab1308615bcf84b7d2119
