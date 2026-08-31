@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: d2724e013d026a49359ab1308615bcf84b7d2119
+    changeNotes: Revert the Promise/JSON require removal -- confirmed live they were never redundant, only the redefinition warning was misread
   - sha: 84112a98a39ee4f652d2a9b125df3d1c96dbf2e0
     changeNotes: Rewrite cache test mocks to avoid empty object literal const declarations, which the Tests tab parser rejected regardless of identifier name
   - sha: 88a01add0be8d6539ee1e32e3010bb4d5dba3adf
