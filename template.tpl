@@ -172,6 +172,23 @@ function readCache(cacheKey, ttlSeconds) {
   return entry.corrected;
 }
 
+// No try/catch is available in this sandboxed grammar, and JSON.parse
+// throws (rather than returning undefined, contrary to Google's own
+// documented contract -- confirmed live: an isolated JSON.parse('not
+// json') call throws the same "not valid JSON" error, independent of
+// everything else in this template). The only way to avoid that throw
+// is to never call JSON.parse on something that isn't shaped like JSON
+// in the first place. This isn't a full validator -- it can't be, with
+// no way to catch a deeper syntax error inside a string that starts and
+// ends correctly -- but it's a cheap guard against the realistic failure
+// modes (an HTML error page, an empty body, plain text, a truncated
+// response) without ever risking the throw for the common case.
+function looksLikeJsonObject(str) {
+  if (typeof str !== 'string') return false;
+  const trimmed = str.trim();
+  return trimmed.charAt(0) === '{' && trimmed.charAt(trimmed.length - 1) === '}';
+}
+
 function writeCache(cacheKey, corrected) {
   templateDataStorage.setItemCopy(cacheKey, {
     corrected: corrected,
@@ -252,6 +269,10 @@ function run() {
     (result) => {
       if (result.statusCode !== 200) {
         logToConsole('Inflight: ingestion API returned status ' + result.statusCode + ' — returning uncorrected UTMs.');
+        return utms;
+      }
+      if (!looksLikeJsonObject(result.body)) {
+        logToConsole('Inflight: ingestion API response is not a JSON object — returning uncorrected UTMs.');
         return utms;
       }
       const corrected = JSON.parse(result.body);
