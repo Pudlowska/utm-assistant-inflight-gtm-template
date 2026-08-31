@@ -52,14 +52,28 @@ ___TEMPLATE_PARAMETERS___
     "displayName": "Cloud Region",
     "macrosInSelect": false,
     "selectItems": [
+      { "value": "northamerica-northeast1", "displayValue": "CA East (Canada)" },
       { "value": "us-central1", "displayValue": "US Center (Iowa)" },
+      { "value": "us-east1", "displayValue": "US East (South Carolina)" },
       { "value": "us-west1", "displayValue": "US West (Oregon)" },
+      { "value": "southamerica-east1", "displayValue": "SA East (Brazil)" },
+      { "value": "southamerica-west1", "displayValue": "SA West (Chile)" },
+      { "value": "europe-west2", "displayValue": "EU West (England)" },
+      { "value": "europe-west1", "displayValue": "EU West (Belgium)" },
       { "value": "europe-west3", "displayValue": "EU West (Germany)" },
       { "value": "europe-north1", "displayValue": "EU North (Finland)" },
-      { "value": "europe-central2", "displayValue": "EU East (Poland)" }
+      { "value": "europe-west4", "displayValue": "EU North (Netherlands)" },
+      { "value": "europe-central2", "displayValue": "EU East (Poland)" },
+      { "value": "europe-west9", "displayValue": "EU Center (France)" },
+      { "value": "europe-west8", "displayValue": "EU South (Italy)" },
+      { "value": "me-central1", "displayValue": "ME Center (Qatar)" },
+      { "value": "asia-northeast1", "displayValue": "JP Center (Japan)" },
+      { "value": "asia-south1", "displayValue": "AP South (India)" },
+      { "value": "asia-southeast1", "displayValue": "AP East (Singapore)" },
+      { "value": "australia-southeast1", "displayValue": "AU East (Australia)" }
     ],
     "simpleValueType": true,
-    "help": "Must match the Cloud Run region this sGTM container runs in — a mismatched region adds cross-region latency and defeats the point of this setting. Only these 5 of the ingestion API's eventual 19 regions are live today; the rest are blocked on a pending Cloud Run region-count quota increase and will be added back to this list once that clears — see this repo's README's \"Cloud Region mapping\" section for the full target list and current status per region.",
+    "help": "Must match the Cloud Run region this sGTM container runs in — a mismatched region adds cross-region latency and defeats the point of this setting. See this repo's README's \"Cloud Region mapping\" section for disambiguation notes on a handful of these labels.",
     "valueValidators": [
       { "type": "NON_EMPTY" }
     ]

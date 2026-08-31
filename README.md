@@ -160,61 +160,53 @@ Cloud Run region list. Most resolve unambiguously (only one region exists
 in that country); a handful didn't and were disambiguated — **verify these
 against your actual GTM region picker before relying on them**.
 
-**Region availability: only 5 of these 19 are selectable in the dropdown
-today.** `utm-assistant-cr-inflight`'s load balancer currently only routes
-to `us-central1`, `us-west1`, `europe-west3`, `europe-north1`, and
-`europe-central2` — the rest are blocked on a pending Cloud Run
-region-count quota increase (GCP case
-`622fd189-13ec-4c20-810d-03eef3b987f5`, filed 2026-08-29, Google's own ETA
-2-3 weeks). The tables below list the full 19-region target — kept as
-reference (including the disambiguation notes, still relevant once a
-region goes live) rather than trimmed down — with a **Status** column
-marking what's actually usable right now. A region marked "Pending quota"
-isn't in the dropdown yet; selecting it isn't possible until it's added
-back once the quota clears.
+**All 19 regions are live and selectable in the dropdown** (as of
+2026-08-31 — the Cloud Run region-count quota increase, GCP case
+`622fd189-13ec-4c20-810d-03eef3b987f5`, was approved 5 → 22, and
+`utm-assistant-cr-inflight`'s load balancer now routes to all 19,
+verified in production). The tables below are the full reference list.
 
 ### Americas
 
-| Display label | Region code | Status | Note |
-|---|---|---|---|
-| CA East (Canada) | `northamerica-northeast1` | Pending quota | ⚠ Defaulted to Montreal over Toronto (`northamerica-northeast2`). |
-| US Center (Iowa) | `us-central1` | **Live** | |
-| US East (South Carolina) | `us-east1` | Pending quota | |
-| US West (Oregon) | `us-west1` | **Live** | |
-| SA East (Brazil) | `southamerica-east1` | Pending quota | |
-| SA West (Chile) | `southamerica-west1` | Pending quota | |
+| Display label | Region code | Note |
+|---|---|---|
+| CA East (Canada) | `northamerica-northeast1` | ⚠ Defaulted to Montreal over Toronto (`northamerica-northeast2`). |
+| US Center (Iowa) | `us-central1` | |
+| US East (South Carolina) | `us-east1` | |
+| US West (Oregon) | `us-west1` | |
+| SA East (Brazil) | `southamerica-east1` | |
+| SA West (Chile) | `southamerica-west1` | |
 
 ### Europe
 
-| Display label | Region code | Status | Note |
-|---|---|---|---|
-| EU West (England) | `europe-west2` | Pending quota | ⚠ Source list said "EU North (England)" — no Cloud Run region matches north+England. London is `europe-west2`; relabeled. |
-| EU West (Belgium) | `europe-west1` | Pending quota | |
-| EU West (Germany) | `europe-west3` | **Live** | ⚠ Source list said "EU Center (Germany)" — GCP's actual central-Europe region is Warsaw, not Germany. Frankfurt is `europe-west3`; relabeled. |
-| EU North (Finland) | `europe-north1` | **Live** | |
-| EU North (Netherlands) | `europe-west4` | Pending quota | |
-| EU East (Poland) | `europe-central2` | **Live** | |
-| EU Center (France) | `europe-west9` | Pending quota | |
-| EU South (Italy) | `europe-west8` | Pending quota | ⚠ Defaulted to Milan over Turin (`europe-west12`). |
+| Display label | Region code | Note |
+|---|---|---|
+| EU West (England) | `europe-west2` | ⚠ Source list said "EU North (England)" — no Cloud Run region matches north+England. London is `europe-west2`; relabeled. |
+| EU West (Belgium) | `europe-west1` | |
+| EU West (Germany) | `europe-west3` | ⚠ Source list said "EU Center (Germany)" — GCP's actual central-Europe region is Warsaw, not Germany. Frankfurt is `europe-west3`; relabeled. |
+| EU North (Finland) | `europe-north1` | |
+| EU North (Netherlands) | `europe-west4` | |
+| EU East (Poland) | `europe-central2` | |
+| EU Center (France) | `europe-west9` | |
+| EU South (Italy) | `europe-west8` | ⚠ Defaulted to Milan over Turin (`europe-west12`). |
 
 ### Middle East
 
-| Display label | Region code | Status | Note |
-|---|---|---|---|
-| ME Center (Qatar) | `me-central1` | Pending quota | |
+| Display label | Region code | Note |
+|---|---|---|
+| ME Center (Qatar) | `me-central1` | |
 
 ### Asia-Pacific
 
-| Display label | Region code | Status | Note |
-|---|---|---|---|
-| JP Center (Japan) | `asia-northeast1` | Pending quota | ⚠ Defaulted to Tokyo over Osaka (`asia-northeast2`) — no region is officially "center". |
-| AP South (India) | `asia-south1` | Pending quota | ⚠ Defaulted to Mumbai over Delhi (`asia-south2`). |
-| AP East (Singapore) | `asia-southeast1` | Pending quota | |
-| AU East (Australia) | `australia-southeast1` | Pending quota | ⚠ Defaulted to Sydney over Melbourne (`australia-southeast2`). |
+| Display label | Region code | Note |
+|---|---|---|
+| JP Center (Japan) | `asia-northeast1` | ⚠ Defaulted to Tokyo over Osaka (`asia-northeast2`) — no region is officially "center". |
+| AP South (India) | `asia-south1` | ⚠ Defaulted to Mumbai over Delhi (`asia-south2`). |
+| AP East (Singapore) | `asia-southeast1` | |
+| AU East (Australia) | `australia-southeast1` | ⚠ Defaulted to Sydney over Melbourne (`australia-southeast2`). |
 
 If any ⚠ default is wrong, it's a one-line edit to the `selectItems` array
-in `template.tpl` (for a **Live** region only — a **Pending quota** region
-isn't in `selectItems` at all right now, see above).
+in `template.tpl`.
 
 ## Finding your sGTM container's region
 

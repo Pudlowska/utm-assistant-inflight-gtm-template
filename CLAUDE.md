@@ -97,18 +97,13 @@ in `template.tpl` was hand-authored, not exported from the GTM Template
 Editor — treat it as a starting point and re-verify the Permissions tab in
 the actual editor before first real use.
 
-## Region availability — only 5 of 19 selectable today
-The Cloud Region dropdown currently lists only `us-central1`, `us-west1`,
-`europe-west3`, `europe-north1`, and `europe-central2` — the only regions
-`utm-assistant-cr-inflight`'s load balancer actually routes to right now.
-The other 14 are blocked on a pending Cloud Run region-count quota
-increase (GCP case `622fd189-13ec-4c20-810d-03eef3b987f5`, filed
-2026-08-29, Google's own ETA 2-3 weeks) — see that repo's
-`infra/variables.tf` `active_regions` comment. Once the quota clears and
-that repo's load balancer is re-applied against the full region list,
-add the remaining 14 entries back to `cloudRegion`'s `selectItems` here
-(full list + labels in this repo's README's "Cloud Region mapping"
-section, which was deliberately left un-trimmed as the target list).
+## Region availability — all 19 selectable (since 2026-08-31)
+The Cloud Region dropdown lists all 19 target regions. The GCP region-count
+quota that previously capped `utm-assistant-cr-inflight`'s load balancer
+at 5 live regions (case `622fd189-13ec-4c20-810d-03eef3b987f5`) was
+approved 5 → 22; that repo's load balancer now routes to all 19,
+verified in production. Full label/region-code list and disambiguation
+notes are in this repo's README's "Cloud Region mapping" section.
 
 ## Consumes
 The heuristic JSON schema owned by `utm-assistant-app`. If that schema
