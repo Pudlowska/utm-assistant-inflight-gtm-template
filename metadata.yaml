@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 2280d14f268e324a20cb2b31ab8aec48153f702d
+    changeNotes: Cloud Region dropdown widened back to all 19 regions — the pending quota increase blocking 14 of them was approved
   - sha: 929c289f33192f8033c20f4e4113ff45eb97e315
     changeNotes: read utm_id/utm_source_platform (GA4's full reported UTM set) alongside the original 5; Cloud Region dropdown restricted to the 5 regions currently live
   - sha: 029e4461daf2c9bb870a09af7c5cfd2f79e67756
