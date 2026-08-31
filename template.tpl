@@ -510,16 +510,24 @@ scenarios:
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'broken-source', utm_medium: 'cpc', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
-    const cacheStore = {};
+    let cachedKey;
+    let cachedValue;
     mock('templateDataStorage', {
-      getItemCopy: (key) => (cacheStore[key] !== undefined ? cacheStore[key] : null),
+      getItemCopy: (key) => (key === cachedKey ? cachedValue : null),
       setItemCopy: (key, value) => {
-        cacheStore[key] = value;
+        cachedKey = key;
+        cachedValue = value;
       },
       removeItem: (key) => {
-        delete cacheStore[key];
+        if (key === cachedKey) {
+          cachedKey = undefined;
+          cachedValue = undefined;
+        }
       },
-      clear: () => {}
+      clear: () => {
+        cachedKey = undefined;
+        cachedValue = undefined;
+      }
     });
     let httpCallCount = 0;
     const correctedBody = JSON.stringify({utm_source: 'fixed-source', utm_medium: 'cpc'});
@@ -540,16 +548,24 @@ scenarios:
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'broken-source', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
-    const cacheStore = {};
+    let cachedKey;
+    let cachedValue;
     mock('templateDataStorage', {
-      getItemCopy: (key) => (cacheStore[key] !== undefined ? cacheStore[key] : null),
+      getItemCopy: (key) => (key === cachedKey ? cachedValue : null),
       setItemCopy: (key, value) => {
-        cacheStore[key] = value;
+        cachedKey = key;
+        cachedValue = value;
       },
       removeItem: (key) => {
-        delete cacheStore[key];
+        if (key === cachedKey) {
+          cachedKey = undefined;
+          cachedValue = undefined;
+        }
       },
-      clear: () => {}
+      clear: () => {
+        cachedKey = undefined;
+        cachedValue = undefined;
+      }
     });
     let httpCallCount = 0;
     const correctedBody = JSON.stringify({utm_source: 'fixed-source'});
