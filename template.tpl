@@ -517,25 +517,6 @@ scenarios:
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'broken-source', utm_medium: 'cpc', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
-    let cachedKey;
-    let cachedValue;
-    mock('templateDataStorage', {
-      getItemCopy: (key) => (key === cachedKey ? cachedValue : null),
-      setItemCopy: (key, value) => {
-        cachedKey = key;
-        cachedValue = value;
-      },
-      removeItem: (key) => {
-        if (key === cachedKey) {
-          cachedKey = undefined;
-          cachedValue = undefined;
-        }
-      },
-      clear: () => {
-        cachedKey = undefined;
-        cachedValue = undefined;
-      }
-    });
     let httpCallCount = 0;
     const correctedBody = JSON.stringify({utm_source: 'fixed-source', utm_medium: 'cpc'});
     mock('sendHttpGet', () => {
@@ -557,25 +538,6 @@ scenarios:
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'broken-source', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
-    let cachedKey;
-    let cachedValue;
-    mock('templateDataStorage', {
-      getItemCopy: (key) => (key === cachedKey ? cachedValue : null),
-      setItemCopy: (key, value) => {
-        cachedKey = key;
-        cachedValue = value;
-      },
-      removeItem: (key) => {
-        if (key === cachedKey) {
-          cachedKey = undefined;
-          cachedValue = undefined;
-        }
-      },
-      clear: () => {
-        cachedKey = undefined;
-        cachedValue = undefined;
-      }
-    });
     let httpCallCount = 0;
     const correctedBody = JSON.stringify({utm_source: 'fixed-source'});
     mock('sendHttpGet', () => {
