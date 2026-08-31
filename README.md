@@ -160,12 +160,6 @@ Cloud Run region list. Most resolve unambiguously (only one region exists
 in that country); a handful didn't and were disambiguated — **verify these
 against your actual GTM region picker before relying on them**.
 
-**All 19 regions are live and selectable in the dropdown** (as of
-2026-08-31 — the Cloud Run region-count quota increase, GCP case
-`622fd189-13ec-4c20-810d-03eef3b987f5`, was approved 5 → 22, and
-`utm-assistant-cr-inflight`'s load balancer now routes to all 19,
-verified in production). The tables below are the full reference list.
-
 ### Americas
 
 | Display label | Region code | Note |
