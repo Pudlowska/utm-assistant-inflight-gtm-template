@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 793c3ca6519d3d037447ca5cdd58136e3385891f
+    changeNotes: Fix send_http permission -- allowedUrls=specific requires the urls list, was missing entirely
   - sha: 2280d14f268e324a20cb2b31ab8aec48153f702d
     changeNotes: Cloud Region dropdown widened back to all 19 regions — the pending quota increase blocking 14 of them was approved
   - sha: 929c289f33192f8033c20f4e4113ff45eb97e315
