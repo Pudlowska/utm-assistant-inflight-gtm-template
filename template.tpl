@@ -403,7 +403,6 @@ ___TESTS___
 scenarios:
 - name: no utm params - resolves the incoming (empty) payload directly, does not call the API
   code: |-
-    const Promise = require('Promise');
     mock('logToConsole', () => {});
     mock('getEventData', () => undefined);
     let httpCallCount = 0;
@@ -423,8 +422,6 @@ scenarios:
 
 - name: cache disabled - resolves corrected values from a 200 response
   code: |-
-    const Promise = require('Promise');
-    const JSON = require('JSON');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'faceboook', utm_medium: 'social', utm_campaign: 'summer-sale', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
@@ -444,7 +441,6 @@ scenarios:
 
 - name: request URL and headers are built from region, auto-detected property id, and api key
   code: |-
-    const Promise = require('Promise');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'ig', utm_medium: 'paid', 'x-ga-measurement_id': 'G-PROP42'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
@@ -470,7 +466,6 @@ scenarios:
 
 - name: propertyIdOverride takes priority over the auto-detected measurement id
   code: |-
-    const Promise = require('Promise');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'ig', 'x-ga-measurement_id': 'G-FROMEVENT'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
@@ -512,19 +507,17 @@ scenarios:
 
 - name: repeat identical hit is served from cache, not a second API call
   code: |-
-    const Promise = require('Promise');
-    const JSON = require('JSON');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'broken-source', utm_medium: 'cpc', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
-    const store = {};
+    const cacheStore = {};
     mock('templateDataStorage', {
-      getItemCopy: (key) => (store[key] !== undefined ? store[key] : null),
+      getItemCopy: (key) => (cacheStore[key] !== undefined ? cacheStore[key] : null),
       setItemCopy: (key, value) => {
-        store[key] = value;
+        cacheStore[key] = value;
       },
       removeItem: (key) => {
-        delete store[key];
+        delete cacheStore[key];
       },
       clear: () => {}
     });
@@ -544,19 +537,17 @@ scenarios:
 
 - name: cache entry older than its TTL triggers a fresh API call
   code: |-
-    const Promise = require('Promise');
-    const JSON = require('JSON');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'broken-source', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
-    const store = {};
+    const cacheStore = {};
     mock('templateDataStorage', {
-      getItemCopy: (key) => (store[key] !== undefined ? store[key] : null),
+      getItemCopy: (key) => (cacheStore[key] !== undefined ? cacheStore[key] : null),
       setItemCopy: (key, value) => {
-        store[key] = value;
+        cacheStore[key] = value;
       },
       removeItem: (key) => {
-        delete store[key];
+        delete cacheStore[key];
       },
       clear: () => {}
     });
@@ -580,7 +571,6 @@ scenarios:
 
 - name: non-200 response fails open and resolves the raw utms unchanged
   code: |-
-    const Promise = require('Promise');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'x', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
@@ -597,7 +587,6 @@ scenarios:
 
 - name: unparseable response body fails open and resolves the raw utms unchanged
   code: |-
-    const Promise = require('Promise');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'x', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
@@ -614,7 +603,6 @@ scenarios:
 
 - name: a rejected request fails open and resolves the raw utms unchanged
   code: |-
-    const Promise = require('Promise');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'x', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
@@ -631,8 +619,6 @@ scenarios:
 
 - name: partial correction overrides the corrected key, falls back to raw for the rest
   code: |-
-    const Promise = require('Promise');
-    const JSON = require('JSON');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'x', utm_medium: 'y', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
@@ -651,9 +637,7 @@ scenarios:
 
 - name: resolved object never includes a key absent from the incoming event
   code: |-
-    const Promise = require('Promise');
     const Object = require('Object');
-    const JSON = require('JSON');
     mock('logToConsole', () => {});
     const eventValues = {utm_source: 'x', 'x-ga-measurement_id': 'G-DEMO123'};
     mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
