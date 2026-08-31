@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 84112a98a39ee4f652d2a9b125df3d1c96dbf2e0
+    changeNotes: Rewrite cache test mocks to avoid empty object literal const declarations, which the Tests tab parser rejected regardless of identifier name
   - sha: 88a01add0be8d6539ee1e32e3010bb4d5dba3adf
     changeNotes: Fix test suite -- drop redundant Promise/JSON requires, rename store to cacheStore (both found live in the Template Editor Tests tab)
   - sha: 793c3ca6519d3d037447ca5cdd58136e3385891f
