@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 6782fc00e9be35883159b01796dd71595a8ac589
+    changeNotes: Remove the Property ID override field -- auto-provisioning on the ingestion side made a manual test value create a real spurious property
   - sha: 07b7bcc53771beb8b830bd65171cc82c6c34f0d5
     changeNotes: Guard JSON.parse with a shape check -- confirmed live it throws on invalid input, contrary to documented behavior, and try/catch is unavailable
   - sha: efbf3d4b0439e9afd6632f16654b56cce7ebebeb
