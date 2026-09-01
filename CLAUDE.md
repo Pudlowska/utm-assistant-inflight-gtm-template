@@ -78,11 +78,21 @@ breaking the gallery's structure requirements.
 As of 2026-08-26, the property is not a required config field. It's read
 per-event via `getEventData('x-ga-measurement_id')` — the GA4 Client
 populates this once it parses the incoming hit — so one variable instance
-covers every GA4 property flowing through a shared sGTM container.
-`propertyIdOverride` (optional template field) takes priority over the
-auto-detected value, for non-GA4 traffic or testing. No property id
-resolvable (neither override nor `x-ga-measurement_id`) fails open
+covers every GA4 property flowing through a shared sGTM container. No
+property id resolvable (`x-ga-measurement_id` absent) fails open
 immediately, without an API call — resolves to the raw utms unchanged.
+
+**No manual override field (removed 2026-09-01).** There was a
+`propertyIdOverride` template field for non-GA4 traffic or manual
+testing, taking priority over the auto-detected value. Removed once
+`utm-assistant-cr-inflight`'s `/inflight` endpoint started
+auto-provisioning a real `inflightCorrections` doc for whatever
+`property_id` it receives (see that repo's `src/firestore.ts`,
+`provisionCorrection`) — a typed-in test value would otherwise create a
+real, spurious property under the account (consuming its paid quota,
+cluttering the dashboard) rather than being harmlessly ignored the way
+it was before that change. Don't re-add this field without re-solving
+that problem first.
 
 ## Required permissions
 `read_event_data` scoped to the seven `utm_*` keys (`utm_id`, `utm_source`,

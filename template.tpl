@@ -31,13 +31,6 @@ ___TEMPLATE_PARAMETERS___
 [
   {
     "type": "TEXT",
-    "name": "propertyIdOverride",
-    "displayName": "Property ID override (optional)",
-    "simpleValueType": true,
-    "help": "Leave blank in the normal case — the property is auto-detected per event from the GA4 Client's x-ga-measurement_id. Only set this for sGTM containers that receive non-GA4 traffic (no GA4 Client in the request path), or for testing."
-  },
-  {
-    "type": "TEXT",
     "name": "apiKey",
     "displayName": "API Key",
     "simpleValueType": true,
@@ -143,13 +136,14 @@ function readIncomingUtms() {
   return hasAny ? values : null;
 }
 
-// Auto-detected from the GA4 Client's parsed measurement ID unless a manual
-// override is set. Lets one variable instance cover every GA4 stream in a
-// shared sGTM container, instead of one instance per property.
+// Auto-detected from the GA4 Client's parsed measurement ID. Lets one
+// variable instance cover every GA4 stream in a shared sGTM container,
+// instead of one instance per property. No manual override: the ingestion
+// endpoint auto-provisions a real inflightCorrections doc for whatever
+// property_id it receives, so a typed-in test value would create a real
+// (spurious) property under the account rather than being harmlessly
+// ignored — deliberately removed for that reason, not an oversight.
 function resolvePropertyId() {
-  if (data.propertyIdOverride) {
-    return data.propertyIdOverride;
-  }
   return getEventData('x-ga-measurement_id');
 }
 
@@ -489,28 +483,6 @@ scenarios:
       assertThat(capturedOptions.headers['X-Api-Key']).isEqualTo('demo-api-key');
     });
 
-- name: propertyIdOverride takes priority over the auto-detected measurement id
-  code: |-
-    const Promise = require('Promise');
-    mock('logToConsole', () => {});
-    const eventValues = {utm_source: 'ig', 'x-ga-measurement_id': 'G-FROMEVENT'};
-    mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
-    mock('templateDataStorage', {
-      getItemCopy: () => null,
-      setItemCopy: () => {},
-      removeItem: () => {},
-      clear: () => {}
-    });
-    let capturedUrl;
-    mock('sendHttpGet', (url) => {
-      capturedUrl = url;
-      return Promise.create((resolve) => resolve({statusCode: 200, body: '{}'}));
-    });
-    return runCode({propertyIdOverride: 'manual-override', apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
-      assertThat(capturedUrl.indexOf('property_id=manual-override') > -1).isEqualTo(true);
-      assertThat(capturedUrl.indexOf('G-FROMEVENT') > -1).isEqualTo(false);
-    });
-
 - name: no property id resolvable - resolves the raw utms unchanged and does not call the API
   code: |-
     mock('logToConsole', () => {});
@@ -682,8 +654,8 @@ this template attempted that and it does not work). Instead:
 Setup, per sGTM container:
 1. Import this template once, instantiate one variable from it (e.g. named
    "Inflight - Correction Data"). Fill in API Key, Cloud Region, and the
-   cache/timeout options. Leave "Property ID override" blank unless this
-   container receives non-GA4 traffic — see "Property resolution" below.
+   cache/timeout options — see "Property resolution" below for how the
+   property itself is determined.
 2. Create a native **Augment Event Transformation** (Transformations ->
    New -> Augment Event). Under Parameters to Augment, map each utm_ key
    you want corrected to its property path on the resolved object, e.g.
@@ -700,8 +672,10 @@ Setup, per sGTM container:
 Property resolution: the property is auto-detected per event from the GA4
 Client's `x-ga-measurement_id` (requires the `read_event_data` permission
 for that key, declared in this template). One variable instance covers
-every GA4 property flowing through a shared container. Set the "Property
-ID override" field only for non-GA4 traffic or testing.
+every GA4 property flowing through a shared container. No manual override
+field — if `x-ga-measurement_id` isn't present on an event (no GA4 Client
+in the request path), the variable fails open immediately and resolves
+the raw, uncorrected `utm_*` values without calling the ingestion API.
 
 Cloud Region: MUST match the Cloud Run region this sGTM container runs in.
 See this repo's README for the full label → region-code mapping and the

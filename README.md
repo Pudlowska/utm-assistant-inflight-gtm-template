@@ -38,8 +38,8 @@ being referenced directly in a tag field.
 2. Under **User-Defined Variables**, click **New**.
 3. Open **Variable Configuration** and select the template under *Custom*.
 4. Fill in API Key, Cloud Region, and the cache/timeout options (see the
-   field table below). Leave **Property ID override** blank — see
-   "Property resolution" below.
+   field table below) — see "Property resolution" below for how the
+   property itself is determined.
 5. Name the variable (e.g. `Inflight - Correction Data`) and **Save**.
 
 ### Step 3: Create an Augment Event Transformation
@@ -105,7 +105,6 @@ would read any other event parameter.
 |---|---|---|
 | API Key | Required | Issued per account from the Inflight dashboard. Sent as the `X-Api-Key` header. |
 | Cloud Region | Required | Must match the Cloud Run region this sGTM container runs in. See table below. |
-| Property ID override | Optional — default: blank | Leave blank — see "Property resolution" below. Only set this for containers that receive non-GA4 traffic, or for testing. |
 | Cache corrections on this server instance | Optional — default: true | See "Caching" below. |
 | Cache TTL (seconds) | Optional — default: 21600 (6h) | Lower if correction rulesets change often. |
 | Request timeout (ms) | Optional — default: 400 | This call sits in the hot path before every tag fires — keep it tight. |
@@ -123,13 +122,16 @@ This means **one variable instance covers every GA4 property** routed
 through a shared sGTM container — no per-property variable instances or
 manual property ID entry needed.
 
-If **Property ID override** is set, it always takes priority over the
-auto-detected measurement ID. Use it for sGTM containers that receive
-non-GA4 traffic (no GA4 Client in the request path, so
-`x-ga-measurement_id` is never populated), or while testing. If neither the
-override nor `x-ga-measurement_id` is available on an event, the variable
-fails open immediately without calling the ingestion API — it resolves to
-the raw, uncorrected `utm_*` values instead.
+There's no manual override field. If `x-ga-measurement_id` isn't available
+on an event (no GA4 Client in the request path — e.g. non-GA4 traffic),
+the variable fails open immediately without calling the ingestion API —
+it resolves to the raw, uncorrected `utm_*` values instead. An earlier
+version of this template had a "Property ID override" field for that
+case and for manual testing; it was removed once the ingestion endpoint
+started auto-provisioning a real property record for whatever
+`property_id` it receives (see `utm-assistant-cr-inflight`) — a typed-in
+test value would otherwise create a real, spurious property under the
+account rather than being harmlessly ignored.
 
 ## Endpoint
 
@@ -138,10 +140,9 @@ GET https://{cloud-region}.cr.utm-assistant.ai/inflight?property_id=...&utm_id=.
 X-Api-Key: {apiKey}
 ```
 
-`property_id` is the auto-detected GA4 measurement ID (`G-XXXXXXXXXX`) in
-the common case, or the **Property ID override** value if one is set — see
-"Property resolution" above. Either way it arrives as a plain string; the
-ingestion API doesn't need to know which source it came from.
+`property_id` is the auto-detected GA4 measurement ID (`G-XXXXXXXXXX`) —
+see "Property resolution" above. It arrives as a plain string; the
+ingestion API doesn't need to know it's specifically a GA4 measurement ID.
 
 Expects a `200` JSON response with any subset of the five `utm_*` keys —
 only keys present on the incoming event are included in the variable's
