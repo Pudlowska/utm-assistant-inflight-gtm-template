@@ -18,13 +18,24 @@ breaking the gallery's structure requirements.
   template type and was scrapped. The current design is a plain sGTM
   Custom Variable that resolves to a JSON object (see "Return shape"
   below). Routing that value into destination tags is the container
-  owner's job, done via a native **Augment Event Transformation** that
-  maps each `utm_*` parameter to its property path on the resolved
-  object (e.g. `{{Inflight - Correction Data}}.utm_medium`) — GTM's own
-  built-in write mechanism, distinct from (and unaffected by) the
-  `setInEventData` limitation above. See `___NOTES___` in `template.tpl`
-  and the README's Installation section for the exact setup. No
-  per-field extractor variables or per-tag field mapping are needed.
+  owner's job, done via a native **Augment Event Transformation** — but
+  its Value field can only map to a bare `{{Variable}}` reference, not
+  `{{Inflight - Correction Data}}.utm_medium` (a reference plus a
+  trailing property path). Confirmed live, not just suspected: sGTM only
+  awaits a Promise-returning variable when a field is exactly one
+  `{{Variable}}` reference and nothing else; add trailing text and it
+  switches to string-template mode, which stringifies the (unawaited,
+  empty) variable and appends the literal text — every mapped field
+  silently resolves to garbage like `.utm_medium`, no error thrown. **One
+  Custom JavaScript extractor variable per `utm_*` key is therefore
+  required** (each doing `return {{Inflight - Correction Data}}.utm_medium;`
+  *inside* its sandboxed JS body, where the reference isn't mixed into a
+  string template), referenced as a bare `{{Inflight - utm_medium}}` in
+  the Transformation. An Event Data variable type does not substitute for
+  this — it reads the original incoming event, not this template's
+  resolved object, so it would run without error while never actually
+  correcting anything. See `___NOTES___` in `template.tpl` and the
+  README's Installation section (Steps 3-4) for the exact setup.
 - **Async via a returned Promise, same as any sGTM variable.** Returning a
   `sendHttpGet(...).then(...)` chain tells sGTM to pause any tag this
   variable (or an extractor variable derived from it) is mapped into,

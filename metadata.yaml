@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 76189d0e236f5a70890b975aa1bf1477a3ec3f00
+    changeNotes: Fix ___NOTES___ setup steps -- a Transformation Value field can't resolve {{Variable}}.property against a Promise-returning variable; document the required per-key Custom JavaScript extractor variable instead
   - sha: 1c24265bcfebcbb719cef2ee9c15e0cb1d4d7527
     changeNotes: Cloud Region dropdown now shows the actual region identifier (e.g. "us-central1") alongside the city/country label
   - sha: 6782fc00e9be35883159b01796dd71595a8ac589
