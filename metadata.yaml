@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 1c24265bcfebcbb719cef2ee9c15e0cb1d4d7527
+    changeNotes: Cloud Region dropdown now shows the actual region identifier (e.g. "us-central1") alongside the city/country label
   - sha: 6782fc00e9be35883159b01796dd71595a8ac589
     changeNotes: Remove the Property ID override field -- auto-provisioning on the ingestion side made a manual test value create a real spurious property
   - sha: 07b7bcc53771beb8b830bd65171cc82c6c34f0d5
