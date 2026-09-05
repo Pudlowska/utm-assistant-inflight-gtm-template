@@ -161,44 +161,53 @@ Cloud Run region list. Most resolve unambiguously (only one region exists
 in that country); a handful didn't and were disambiguated — **verify these
 against your actual GTM region picker before relying on them**.
 
+The **Legacy `.a.run.app` code** column is the two-letter (or short)
+region suffix Cloud Run puts in a service's default URL under its older
+URL scheme (e.g. `...-uc.a.run.app`) — see Method 4 below. Google does
+not publish this mapping (its own docs explicitly say not to parse this
+identifier — see Method 4's caveat); every value below was verified
+directly against `utm-assistant-cr-inflight`'s own live Cloud Run
+deployment across all 19 of these regions (`gcloud run services list`),
+not copied from a third-party table.
+
 ### Americas
 
-| Display label | Region code | Note |
-|---|---|---|
-| CA East (Canada) | `northamerica-northeast1` | ⚠ Defaulted to Montreal over Toronto (`northamerica-northeast2`). |
-| US Center (Iowa) | `us-central1` | |
-| US East (South Carolina) | `us-east1` | |
-| US West (Oregon) | `us-west1` | |
-| SA East (Brazil) | `southamerica-east1` | |
-| SA West (Chile) | `southamerica-west1` | |
+| Display label | Region code | Legacy `.a.run.app` code | Note |
+|---|---|---|---|
+| CA East (Canada) | `northamerica-northeast1` | `nn` | ⚠ Defaulted to Montreal over Toronto (`northamerica-northeast2`). |
+| US Center (Iowa) | `us-central1` | `uc` | |
+| US East (South Carolina) | `us-east1` | `ue` | |
+| US West (Oregon) | `us-west1` | `uw` | |
+| SA East (Brazil) | `southamerica-east1` | `rj` | |
+| SA West (Chile) | `southamerica-west1` | `tl` | |
 
 ### Europe
 
-| Display label | Region code | Note |
-|---|---|---|
-| EU West (England) | `europe-west2` | ⚠ Source list said "EU North (England)" — no Cloud Run region matches north+England. London is `europe-west2`; relabeled. |
-| EU West (Belgium) | `europe-west1` | |
-| EU West (Germany) | `europe-west3` | ⚠ Source list said "EU Center (Germany)" — GCP's actual central-Europe region is Warsaw, not Germany. Frankfurt is `europe-west3`; relabeled. |
-| EU North (Finland) | `europe-north1` | |
-| EU North (Netherlands) | `europe-west4` | |
-| EU East (Poland) | `europe-central2` | |
-| EU Center (France) | `europe-west9` | |
-| EU South (Italy) | `europe-west8` | ⚠ Defaulted to Milan over Turin (`europe-west12`). |
+| Display label | Region code | Legacy `.a.run.app` code | Note |
+|---|---|---|---|
+| EU West (England) | `europe-west2` | `nw` | ⚠ Source list said "EU North (England)" — no Cloud Run region matches north+England. London is `europe-west2`; relabeled. |
+| EU West (Belgium) | `europe-west1` | `ew` | |
+| EU West (Germany) | `europe-west3` | `ey` | ⚠ Source list said "EU Center (Germany)" — GCP's actual central-Europe region is Warsaw, not Germany. Frankfurt is `europe-west3`; relabeled. |
+| EU North (Finland) | `europe-north1` | `lz` | |
+| EU North (Netherlands) | `europe-west4` | `ez` | |
+| EU East (Poland) | `europe-central2` | `lm` | |
+| EU Center (France) | `europe-west9` | `od` | |
+| EU South (Italy) | `europe-west8` | `oc` | ⚠ Defaulted to Milan over Turin (`europe-west12`). |
 
 ### Middle East
 
-| Display label | Region code | Note |
-|---|---|---|
-| ME Center (Qatar) | `me-central1` | |
+| Display label | Region code | Legacy `.a.run.app` code | Note |
+|---|---|---|---|
+| ME Center (Qatar) | `me-central1` | `ww` | |
 
 ### Asia-Pacific
 
-| Display label | Region code | Note |
-|---|---|---|
-| JP Center (Japan) | `asia-northeast1` | ⚠ Defaulted to Tokyo over Osaka (`asia-northeast2`) — no region is officially "center". |
-| AP South (India) | `asia-south1` | ⚠ Defaulted to Mumbai over Delhi (`asia-south2`). |
-| AP East (Singapore) | `asia-southeast1` | |
-| AU East (Australia) | `australia-southeast1` | ⚠ Defaulted to Sydney over Melbourne (`australia-southeast2`). |
+| Display label | Region code | Legacy `.a.run.app` code | Note |
+|---|---|---|---|
+| JP Center (Japan) | `asia-northeast1` | `an` | ⚠ Defaulted to Tokyo over Osaka (`asia-northeast2`) — no region is officially "center". |
+| AP South (India) | `asia-south1` | `el` | ⚠ Defaulted to Mumbai over Delhi (`asia-south2`). |
+| AP East (Singapore) | `asia-southeast1` | `as` | |
+| AU East (Australia) | `australia-southeast1` | `ts` | ⚠ Defaulted to Sydney over Melbourne (`australia-southeast2`). |
 
 If any ⚠ default is wrong, it's a one-line edit to the `selectItems` array
 in `template.tpl`.
@@ -245,6 +254,36 @@ If your sGTM container is attached to a custom domain (e.g.
    `x-cloud-trace-context` or similar Google infrastructure headers, which
    often include datacenter location codes (e.g. `fra` for Frankfurt, `iad`
    for Iowa).
+
+### Method 4: Decode the legacy Cloud Run default URL
+
+If your container is on Cloud Run's **Tagging Server** page it usually
+shows a **Default URL** even when a custom domain is also configured.
+Two different URL shapes exist, and only one of them can be decoded by
+eye:
+
+- **Newer, deterministic format** — `SERVICE-PROJECT_NUMBER.REGION.run.app`
+  (e.g. `gtm-abc123-456789012345.europe-west1.run.app`). The region is
+  already spelled out in full — this is just Method 2 above, no lookup
+  needed.
+- **Older, non-deterministic format** — `SERVICE-HASH-XX.a.run.app`,
+  where `XX` is a short region suffix (e.g.
+  `server-side-tagging-hi6gn6gema-uc.a.run.app` → `uc`). This is what
+  most existing sGTM containers still show.
+
+For the older format, look up the `XX` suffix in the **Legacy
+`.a.run.app` code** column of the [Cloud Region mapping](#cloud-region-mapping)
+table above. For example, `uc` → `us-central1`.
+
+**Caveat:** Google does not officially document this suffix mapping.
+Its own [Cloud Run URL documentation](https://cloud.google.com/run/docs/triggering/https-request)
+describes only the newer deterministic format and explicitly warns:
+"Don't parse the SERVICE_IDENTIFIER as it does not have a fixed format,
+and the logic for SERVICE_IDENTIFIER generation is subject to change."
+The table above is empirically verified against this project's own 19
+live regional deployments (not sourced from Google), but treat it as a
+convenience, not a guarantee — if in doubt, use Method 1 (the Cloud Run
+console's own Region column is always authoritative).
 
 ## Caching
 
