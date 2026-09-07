@@ -23,10 +23,10 @@ forward the parameters on.
 The template itself never writes event data (no
 `setInEventData` equivalent for this template type — an earlier version
 tried that and it does not work). Instead, routing the resolved values
-into event data is done with sGTM's native **Augment Event Transformation**,
-via a small per-key extractor variable for each `utm_*` property — see
-Installation below for why the extractor step is required. Server-side
-only; no client-side/web-container equivalent.
+into event data takes **two chained Augment Event Transformations** plus
+one built-in **Event Data** variable per `utm_*` property — see
+Installation below for exactly why a single Transformation isn't enough.
+Server-side only; no client-side/web-container equivalent.
 
 ## Installation
 
@@ -56,62 +56,78 @@ being referenced directly in a tag field.
    property itself is determined.
 5. Name the variable (e.g. `Inflight - Correction Data`) and **Save**.
 
-### Step 3: Create a Custom JavaScript extractor variable per key
+### Step 3: Create the first Transformation — fetch the correction
 
-**Required — do not skip.** The Augment Event Transformation's Value
-field cannot pull `{{Inflight - Correction Data}}.utm_id` (a variable
-reference plus a trailing property path) — confirmed live, not just
-suspected from docs. `{{Inflight - Correction Data}}` returns a Promise
-(it calls `sendHttpGet()` on a cache miss — see "Data flow" below), and
-sGTM only awaits a Promise-returning variable when a field consists of
-**that one `{{Variable}}` reference and nothing else**. Add any trailing
-text and the field switches to string-template mode instead: the variable
-gets stringified as-is (empty, since the Promise isn't awaited in that
-mode) and the literal trailing text is appended untouched. In practice
-this means every row silently resolves to the literal string `.utm_id`,
-`.utm_source`, etc. — real GA4 hits will show these garbage strings as
-their UTM values, not a thrown error, so this is easy to miss without
-checking Preview mode's Modified Event Data panel.
+**Why this can't be one step.** `{{Inflight - Correction Data}}` returns
+a Promise on a cache miss (it calls `sendHttpGet()` — see "Data flow"
+below). sGTM only awaits a Promise-returning variable when a field
+consists of **that one `{{Variable}}` reference and nothing else**. Add
+a trailing property path — `{{Inflight - Correction Data}}.utm_id` — and
+the field switches to string-template mode instead: the variable gets
+stringified unawaited (empty) and the literal trailing text is appended
+as-is. Confirmed live, not just suspected from docs: every row silently
+resolved to the literal string `.utm_id`, `.utm_source`, etc. — real GA4
+hits showed these garbage strings as their UTM values, no error thrown.
+There is also no server-side "Custom JavaScript" variable type to fall
+back on for a hand-written extractor — sGTM removed that type entirely;
+all custom logic there goes through a full Custom Template instead. So
+the fix isn't a smarter Value field or a quick helper variable — it's
+splitting the work into two Transformations, with a plain built-in
+variable type doing the middle step synchronously.
+
+1. **Transformations** → **New**.
+2. Transformation type: **Augment event**.
+3. Under **Parameters to Augment**, one row:
+
+   | Parameter name | Value |
+   |---|---|
+   | `inflight_correction` | `{{Inflight - Correction Data}}` |
+
+   The Value field must be **only** that bare reference — nothing typed
+   before or after it. This is the one case that correctly awaits the
+   Promise, writing the whole resolved object into
+   `event_data.inflight_correction`.
+4. Under **Advanced Settings**, set **Priority** to `10`. This matters:
+   Priority lives here, higher numbers run first, and GTM's own default
+   ordering only disambiguates *different* transformation types (Allow →
+   Augment → Exclude) — since both Transformations in this setup are
+   Augment Event, creation order does **not** decide which runs first.
+   Without an explicit priority here, this step could evaluate *after*
+   Step 5's Transformation, which would try to read
+   `inflight_correction` before it exists.
+5. Matching Conditions: leave it applying to all events (or narrow it).
+   Affected Tags: **All tags** (or specific ones).
+6. Name it (e.g. `Inflight - Fetch Correction`) and **Save**.
+
+### Step 4: Create one Event Data variable per key
+
+Now that the whole corrected object sits in event data under
+`inflight_correction`, pull each key back out with the plain **built-in
+Event Data variable type** — no custom code, no Template Editor, and
+this read is synchronous (no Promise involved), so none of Step 3's
+awaiting nuance applies here.
 
 For each `utm_*` key you want corrected:
 
-1. Go to **Variables** → **User-Defined Variables** → **New**.
-2. Choose **Custom JavaScript** as the variable type.
-3. Name it `Inflight - utm_id` (swap in the key name each time), with:
-   ```js
-   function() {
-     var data = {{Inflight - Correction Data}};
-     return (data && typeof data === 'object') ? data.utm_id : undefined;
-   }
-   ```
-   Referencing `{{Inflight - Correction Data}}` *inside* the sandboxed JS
-   body (rather than in a plain text field) is what correctly waits for
-   the Promise — this is the one place the property-path access actually
-   works, because the reference here is not mixed into a string template.
-4. Repeat for each of the seven keys you need
-   (`utm_source`, `utm_medium`, `utm_campaign`, `utm_source_platform`,
-   `utm_term`, `utm_content`), one Custom JavaScript variable each. You
-   don't need all seven — only create extractors for the fields you
-   actually want corrected.
+1. **Variables** → **User-Defined Variables** → **New**.
+2. Variable type: **Event Data**.
+3. **Key Path**: `inflight_correction.utm_id` (swap in the key name each
+   time) — **plain text, no `{{ }}` braces**. Key Path reads a literal
+   path into event data; it does not resolve variable references, so
+   `{{Inflight - Correction Data}}.utm_id` here fails the same
+   undefined-with-no-error way Step 3's warning describes.
+4. Name it `Inflight - utm_id` and **Save**.
+5. Repeat for each of the seven keys you need (`utm_source`,
+   `utm_medium`, `utm_campaign`, `utm_source_platform`, `utm_term`,
+   `utm_content`). You don't need all seven — only create one for each
+   field you actually want corrected.
 
-**Don't use an Event Data variable type for this.** It reads a key
-straight off the *incoming* event (the original, uncorrected value GTM
-already had) — it has no way to reach into `{{Inflight - Correction
-Data}}`'s resolved object at all, so it would compile and run without
-error but never actually apply a correction.
+### Step 5: Create the second Transformation — apply the correction
 
-### Step 4: Create an Augment Event Transformation
-
-This is a native sGTM feature — no companion template needed. It reads
-each extractor variable's value and writes it into event data, before any
-tag evaluates it.
-
-1. In the sGTM left-hand menu, click **Transformations** → **New**.
-2. Choose **Augment Event** as the transformation type.
-3. Under **Parameters to Augment**, map each `utm_*` key you want
-   corrected to its own extractor variable from Step 3 — **the Value
-   field must contain only the bare `{{Variable}}` reference, nothing
-   else**:
+1. **Transformations** → **New** → **Augment event**.
+2. Under **Parameters to Augment**, map each `utm_*` key to its own Event
+   Data variable from Step 4 — again, **the Value field must contain
+   only the bare `{{Variable}}` reference**:
 
    | Parameter name | Value |
    |---|---|
@@ -123,50 +139,57 @@ tag evaluates it.
    | `utm_term` | `{{Inflight - utm_term}}` |
    | `utm_content` | `{{Inflight - utm_content}}` |
 
-   Only include rows for the extractor variables you actually created.
-   An extractor for a key that wasn't on the incoming event (and so isn't
-   in the resolved object) returns `undefined`; the Transformation leaves
-   that parameter alone rather than clearing it.
-4. Under **Matching Conditions**, set it to trigger on **All Events** (or
-   narrow it, e.g. to events where `utm_source` is populated).
-5. Under **Affected Tags**, leave it empty to apply globally to every tag,
-   or select specific destination tags (GA4, Meta, Google Ads, ...).
-6. Name it (e.g. `Transform - Inflight UTM Correction`) and **Save**.
+   Only include rows for the variables you actually created in Step 4.
+   A key that wasn't on the incoming event (and so isn't in the resolved
+   object) reads back as `undefined`; the Transformation leaves that
+   parameter alone rather than clearing it.
+3. Under **Advanced Settings**, set **Priority** to `5` — anything lower
+   than Step 3's `10` works; the only requirement is that this number is
+   strictly lower, so Step 3 has already populated `inflight_correction`
+   in event data by the time this one runs.
+4. Matching Conditions: same as Step 3 (all events, or narrower).
+   Affected Tags: **All tags** (or the same specific tags as Step 3).
+5. Name it (e.g. `Inflight - Apply Correction`) and **Save**.
 
-No per-tag Parameters/Fields to Set mapping is needed beyond this one
-Transformation — every tag downstream of it reads the corrected `utm_*`
+No per-tag Parameters/Fields to Set mapping is needed beyond these two
+Transformations — every tag downstream reads the corrected `utm_*`
 values from event data automatically, the same way it would read any
-other event parameter. Per-key extractor variables (Step 3) *are*
-required, though — see above.
+other event parameter.
 
-**Verify before publishing**: in Preview mode, confirm "Outgoing HTTP
-Requests from Server" shows a real call to your
-`{region}.cr.utm-assistant.ai/inflight` endpoint, and that Modified Event
-Data shows actual corrected values — not literal strings like `.utm_id`.
+**Verify before publishing**: in Preview mode, click the affected tag and
+check its **Transformations** panel shows both, in order (Fetch
+Correction before Apply Correction). Confirm "Outgoing HTTP Requests from
+Server" shows a real call to your `{region}.cr.utm-assistant.ai/inflight`
+endpoint, and that the tag's own Modified Event Data / Event data tab
+shows actual corrected values on `utm_medium` etc. — not the whole
+`inflight_correction` object, not `undefined`, and not a literal string
+like `.utm_id`. A timeout in the Console panel
+(`sendHttpRequest: Request timed out`) on the very first hit to a region
+is expected — see "Cold starts" further down — retry once before
+assuming something's broken.
 
 ### Data flow
 
-1. An incoming event reaches the Transformation Engine. The
-   `Transform - Inflight UTM Correction` rule evaluates each extractor
-   variable, each of which reads `{{Inflight - Correction Data}}`.
-2. `{{Inflight - Correction Data}}` reads `getEventData()`, checks the
-   cache (see "Caching" below), and on a cache miss calls the ingestion
-   API via `sendHttpGet()`. Because it returns a Promise on that path,
-   and each extractor variable references it directly inside sandboxed
-   JS (not inside a text field), **sGTM automatically pauses
-   transformation processing** (and every tag it feeds into) until the
-   request resolves or times out — no manual sequencing needed. This
-   only holds because each extractor variable's Custom JavaScript body
-   consists of that one direct reference; see Step 3's explanation of why
-   the same reference fails inside a Transformation's Value field
-   instead.
-3. Each extractor variable resolves to one corrected (or, on any failure,
-   original) value; the Augment Event rule writes each into event data,
-   globally, in memory. This is GTM's own native write mechanism for
-   Augment Event — distinct from (and unaffected by) the `setInEventData`
-   limitation mentioned above, which only applies to a template calling
-   it directly from its own sandboxed JS.
-4. Downstream tags fire and read the corrected (or, on any failure, the
+1. An incoming event reaches the Transformation Engine. **Fetch
+   Correction** (Priority 10) evaluates `{{Inflight - Correction Data}}`.
+2. `{{Inflight - Correction Data}}` reads `getEventData()` (falling back
+   to `page_location` — see above), checks the cache (see "Caching"
+   below), and on a cache miss calls the ingestion API via
+   `sendHttpGet()`. Because the Transformation's Value field is that one
+   bare reference and nothing else, **sGTM correctly awaits the Promise**,
+   pausing every tag this Transformation affects until the request
+   resolves or times out.
+3. Fetch Correction writes the resolved object into
+   `event_data.inflight_correction`. This is GTM's own native write
+   mechanism for Augment Event — distinct from (and unaffected by) the
+   `setInEventData` limitation mentioned above, which only applies to a
+   template calling it directly from its own sandboxed JS.
+4. Each Event Data variable from Step 4 synchronously reads its own key
+   back out of `inflight_correction`.
+5. **Apply Correction** (Priority 5, runs after Fetch Correction) writes
+   each Event Data variable's value into its matching top-level `utm_*`
+   parameter.
+6. Downstream tags fire and read the corrected (or, on any failure, the
    original) `utm_*` values straight from event data, with no per-tag
    configuration required.
 
@@ -222,6 +245,24 @@ overridden there; the rest fall back to their raw incoming value. Any
 other status, a timeout, or an unparseable body leaves every key at its
 raw value (fail open — this never blocks a tag or drops a parameter it
 would otherwise have sent).
+
+### Cold starts
+
+The ingestion endpoint (`utm-assistant-cr-inflight`) runs with
+`min_instance_count: 0` in every region by design — cost-conscious
+default until a region has real paying traffic to justify keeping it
+warm. A cold start there takes roughly 1-2 seconds, which blows past
+this template's default 400ms **Request timeout (ms)** setting. Expect
+the *first* hit to a given region (after any idle period) to time out
+and fail open — you'll see `sendHttpRequest: Request timed out` in
+Preview's Console panel, and `inflight_correction` will still contain
+the original, uncorrected UTM values (fail-open, not an error). This is
+expected, not a bug: simply retry the same hit — the container is warm
+for a while afterward, and a second attempt within a minute or two
+should get a real response. If cold starts are a persistent problem for
+a specific region, that's a signal to raise with whoever manages
+`utm-assistant-cr-inflight`'s infra about warming that one region,
+rather than something to fix on the template/container side.
 
 ## Cloud Region mapping
 

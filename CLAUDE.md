@@ -18,24 +18,33 @@ breaking the gallery's structure requirements.
   template type and was scrapped. The current design is a plain sGTM
   Custom Variable that resolves to a JSON object (see "Return shape"
   below). Routing that value into destination tags is the container
-  owner's job, done via a native **Augment Event Transformation** — but
-  its Value field can only map to a bare `{{Variable}}` reference, not
-  `{{Inflight - Correction Data}}.utm_medium` (a reference plus a
-  trailing property path). Confirmed live, not just suspected: sGTM only
-  awaits a Promise-returning variable when a field is exactly one
-  `{{Variable}}` reference and nothing else; add trailing text and it
-  switches to string-template mode, which stringifies the (unawaited,
-  empty) variable and appends the literal text — every mapped field
-  silently resolves to garbage like `.utm_medium`, no error thrown. **One
-  Custom JavaScript extractor variable per `utm_*` key is therefore
-  required** (each doing `return {{Inflight - Correction Data}}.utm_medium;`
-  *inside* its sandboxed JS body, where the reference isn't mixed into a
-  string template), referenced as a bare `{{Inflight - utm_medium}}` in
-  the Transformation. An Event Data variable type does not substitute for
-  this — it reads the original incoming event, not this template's
-  resolved object, so it would run without error while never actually
-  correcting anything. See `___NOTES___` in `template.tpl` and the
-  README's Installation section (Steps 3-4) for the exact setup.
+  owner's job, done via **two chained Augment Event Transformations** —
+  a single one isn't enough, because its Value field can only map to a
+  bare `{{Variable}}` reference, not `{{Inflight - Correction Data}}.utm_medium`
+  (a reference plus a trailing property path). Confirmed live, not just
+  suspected: sGTM only awaits a Promise-returning variable when a field
+  is exactly one `{{Variable}}` reference and nothing else; add trailing
+  text and it switches to string-template mode, which stringifies the
+  (unawaited, empty) variable and appends the literal text — every mapped
+  field silently resolves to garbage like `.utm_medium`, no error thrown.
+  There is also no server-side "Custom JavaScript" variable type to
+  hand-write an extractor with — sGTM removed that type entirely (a real
+  wrong turn taken here before landing on the actual fix, confirmed live
+  when the Template Editor itself has no such option). **The real fix**:
+  Transformation 1 (higher Priority, e.g. 10) writes the whole object
+  into event data under one key (`inflight_correction`) via a bare
+  reference — the one case that correctly awaits the Promise. A built-in
+  **Event Data** variable per `utm_*` key then reads
+  `inflight_correction.utm_medium` back out via its Key Path (plain text,
+  no `{{ }}` — Key Path doesn't resolve variable references, it's a
+  literal path into event data) — synchronous, no Promise involved.
+  Transformation 2 (lower Priority, e.g. 5 — Priority lives under
+  Advanced Settings, higher runs first, and GTM's default type-based
+  ordering doesn't disambiguate two Augment Event transformations against
+  each other, so this must be set explicitly) then maps each `utm_*` key
+  to its own Event Data variable, again as a bare reference. See
+  `___NOTES___` in `template.tpl` and the README's Installation section
+  (Steps 3-5) for the exact setup.
 - **Async via a returned Promise, same as any sGTM variable.** Returning a
   `sendHttpGet(...).then(...)` chain tells sGTM to pause any tag this
   variable (or an extractor variable derived from it) is mapped into,

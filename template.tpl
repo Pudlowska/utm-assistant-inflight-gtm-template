@@ -776,35 +776,45 @@ Setup, per sGTM container:
    "Inflight - Correction Data"). Fill in API Key, Cloud Region, and the
    cache/timeout options — see "Property resolution" below for how the
    property itself is determined.
-2. For each utm_ key you want corrected, create a Custom JavaScript
-   variable (e.g. named "Inflight - utm_medium") that does:
-   `function() { var d = {{Inflight - Correction Data}}; return (d && typeof d === 'object') ? d.utm_medium : undefined; }`
-   This step is REQUIRED, confirmed live: a Transformation Value field
-   containing `{{Inflight - Correction Data}}.utm_medium` (a variable
-   reference plus trailing property path) does NOT work — sGTM only
-   awaits a Promise-returning variable when a field is exactly one
-   `{{Variable}}` reference and nothing else. Mixed with trailing text,
-   the field switches to string-template mode: the variable is
-   stringified unawaited (empty) and the literal text is appended as-is,
-   so every mapped field silently resolves to garbage like `.utm_medium`
-   with no thrown error. Referencing `{{Inflight - Correction Data}}`
-   *inside* a Custom JavaScript variable's own body is what correctly
-   awaits it, since that reference isn't mixed into a string template.
-   An Event Data variable type does not substitute for this either — it
-   reads the original incoming event, not this template's resolved
-   object, so it runs without error while never actually correcting
-   anything.
-3. Create a native **Augment Event Transformation** (Transformations ->
-   New -> Augment Event). Under Parameters to Augment, map each utm_ key
-   you want corrected to its own extractor variable from step 2 as a
-   bare reference, e.g. `utm_medium` -> `{{Inflight - utm_medium}}` (not
-   a property path — just the variable, nothing else in the field). Set
-   Matching Conditions to All Events (or narrower), and Affected Tags to
-   empty (applies globally) or a specific tag selection.
-   This is GTM's own write mechanism for Augment Event — it is not this
-   template calling setInEventData itself, which does not work. No
-   per-tag Parameters/Fields to Set mapping is needed beyond this one
-   Transformation: every downstream tag reads the corrected utm_ values
+2. Create a native Augment Event Transformation (Transformations -> New
+   -> Augment Event), ONE row: name `inflight_correction`, value the
+   BARE reference `{{Inflight - Correction Data}}` -- nothing else in
+   that field. Set its Priority (Advanced Settings) to something high,
+   e.g. 10. This step is REQUIRED and cannot be skipped or merged with
+   step 3, confirmed live: a Transformation Value field containing
+   `{{Inflight - Correction Data}}.utm_medium` (a variable reference plus
+   trailing property path) does NOT work -- sGTM only awaits a
+   Promise-returning variable when a field is exactly one `{{Variable}}`
+   reference and nothing else. Mixed with trailing text, the field
+   switches to string-template mode: the variable is stringified
+   unawaited (empty) and the literal text is appended as-is, so every
+   mapped field silently resolves to garbage like `.utm_medium` with no
+   thrown error. There's also no server-side "Custom JavaScript"
+   variable type to hand-write an extractor with -- sGTM removed that
+   type entirely, unlike client-side GTM.
+3. For each utm_ key you want corrected, create a built-in Event Data
+   variable (e.g. named "Inflight - utm_medium") with Key Path
+   `inflight_correction.utm_medium` -- plain text, no `{{ }}` braces; Key
+   Path reads a literal path into event data, it does not resolve
+   variable references. This is a synchronous read of what step 2 wrote,
+   so none of step 2's awaiting nuance applies here -- no custom code,
+   no Template Editor.
+4. Create a second Augment Event Transformation. Under Parameters to
+   Augment, map each utm_ key you want corrected to its own Event Data
+   variable from step 3 as a bare reference, e.g. `utm_medium` ->
+   `{{Inflight - utm_medium}}` (again, just the variable, nothing else in
+   the field). Set its Priority LOWER than step 2's (e.g. 5) -- Priority
+   lives under Advanced Settings, higher runs first, and GTM's default
+   ordering only disambiguates different transformation types, not two
+   Augment Event transformations against each other, so this must be set
+   explicitly or step 4 may run before step 2 populates
+   inflight_correction. Set Matching Conditions to All Events (or
+   narrower), and Affected Tags to empty (applies globally) or a specific
+   tag selection.
+   Step 2 is GTM's own write mechanism for Augment Event -- it is not
+   this template calling setInEventData itself, which does not work. No
+   per-tag Parameters/Fields to Set mapping is needed beyond these two
+   Transformations: every downstream tag reads the corrected utm_ values
    from event data automatically, same as any other event parameter.
 
 Property resolution: the property is auto-detected per event from the GA4
