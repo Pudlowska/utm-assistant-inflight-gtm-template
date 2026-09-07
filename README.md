@@ -23,10 +23,13 @@ forward the parameters on.
 The template itself never writes event data (no
 `setInEventData` equivalent for this template type — an earlier version
 tried that and it does not work). Instead, routing the resolved values
-into event data takes **two chained Augment Event Transformations** plus
-one built-in **Event Data** variable per `utm_*` property — see
-Installation below for exactly why a single Transformation isn't enough.
-Server-side only; no client-side/web-container equivalent.
+into event data takes **one "fetch" Augment Event Transformation, plus one
+built-in Event Data variable and one "apply" Augment Event Transformation
+per `utm_*` key you want corrected** — see Installation below for exactly
+why a single Transformation isn't enough. This is the exact setup
+confirmed working end-to-end in a real production sGTM container (see the
+screenshots throughout Installation below). Server-side only; no
+client-side/web-container equivalent.
 
 ## Installation
 
@@ -46,6 +49,10 @@ being referenced directly in a tag field.
    `send_http_request`, `access_template_storage`, `logging`) and click
    **Add**.
 
+Confirm it now shows up under **Templates → Variable Templates**:
+
+![Variable Template installed](images/templates-installed.png)
+
 ### Step 2: Instantiate the Variable
 
 1. Go to **Variables** in the left menu.
@@ -55,6 +62,9 @@ being referenced directly in a tag field.
    field table below) — see "Property resolution" below for how the
    property itself is determined.
 5. Name the variable (e.g. `Inflight - Correction Data`) and **Save**.
+   The screenshots throughout this guide name it `inflight_correction`
+   instead (matching the event-data key it feeds in Step 3) — either
+   works, it's just a naming choice.
 
 ### Step 3: Create the first Transformation — fetch the correction
 
@@ -119,51 +129,75 @@ For each `utm_*` key you want corrected:
    `utm_content`). You don't need all seven — only create one for each
    field you actually want corrected.
 
-### Step 5: Create the second Transformation — apply the correction
+Once you've created the main variable from Step 2 plus one Event Data
+variable per key, **Variables → User-Defined Variables** should look like
+this:
+
+![Event Data variables, one per utm_* key, plus the main correction variable](images/variables-list.png)
+
+### Step 5: Create one Transformation per key — apply the correction
+
+Unlike Step 3 (one Transformation, one row), this step is **one
+Transformation per `utm_*` key**, each with a single row. This is the
+exact structure confirmed working end-to-end in a real production
+container (see the screenshot below) — it's not strictly required that
+these be separate Transformation objects rather than several rows inside
+one, but this is what's verified live, so it's what's documented here.
+
+For each key you created an Event Data variable for in Step 4:
 
 1. **Transformations** → **New** → **Augment event**.
-2. Under **Parameters to Augment**, map each `utm_*` key to its own Event
-   Data variable from Step 4 — again, **the Value field must contain
-   only the bare `{{Variable}}` reference**:
+2. Under **Parameters to Augment**, one row mapping that key to its Event
+   Data variable — again, **the Value field must contain only the bare
+   `{{Variable}}` reference**:
 
    | Parameter name | Value |
    |---|---|
    | `utm_id` | `{{Inflight - utm_id}}` |
-   | `utm_source` | `{{Inflight - utm_source}}` |
-   | `utm_medium` | `{{Inflight - utm_medium}}` |
-   | `utm_campaign` | `{{Inflight - utm_campaign}}` |
-   | `utm_source_platform` | `{{Inflight - utm_source_platform}}` |
-   | `utm_term` | `{{Inflight - utm_term}}` |
-   | `utm_content` | `{{Inflight - utm_content}}` |
 
-   Only include rows for the variables you actually created in Step 4.
-   A key that wasn't on the incoming event (and so isn't in the resolved
-   object) reads back as `undefined`; the Transformation leaves that
-   parameter alone rather than clearing it.
+   (swap in the matching key/variable each time — `utm_source` with
+   `{{Inflight - utm_source}}`, and so on).
 3. Under **Advanced Settings**, set **Priority** to `5` — anything lower
    than Step 3's `10` works; the only requirement is that this number is
-   strictly lower, so Step 3 has already populated `inflight_correction`
-   in event data by the time this one runs.
+   strictly lower than Step 3's, so `inflight_correction` already exists
+   in event data by the time these run. All of them can share the same
+   priority — there's no ordering dependency between them, since each
+   only ever reads its own key.
 4. Matching Conditions: same as Step 3 (all events, or narrower).
    Affected Tags: **All tags** (or the same specific tags as Step 3).
-5. Name it (e.g. `Inflight - Apply Correction`) and **Save**.
+5. Name it `Inflight Transformation - utm_id` (swap in the key name) and
+   **Save**.
 
-No per-tag Parameters/Fields to Set mapping is needed beyond these two
+A key that wasn't on the incoming event (and so isn't in the resolved
+object) reads back as `undefined` from its Event Data variable; the
+Transformation leaves that parameter alone rather than clearing it. Only
+create a Transformation for the keys you actually created a variable for
+in Step 4.
+
+**Transformations** should now list the fetch Transformation from Step 3
+plus one apply Transformation per key:
+
+![All Transformations: one fetch, one per utm_* key](images/transformations-list.png)
+
+No per-tag Parameters/Fields to Set mapping is needed beyond these
 Transformations — every tag downstream reads the corrected `utm_*`
 values from event data automatically, the same way it would read any
 other event parameter.
 
 **Verify before publishing**: in Preview mode, click the affected tag and
-check its **Transformations** panel shows both, in order (Fetch
-Correction before Apply Correction). Confirm "Outgoing HTTP Requests from
-Server" shows a real call to your `{region}.cr.utm-assistant.ai/inflight`
-endpoint, and that the tag's own Modified Event Data / Event data tab
-shows actual corrected values on `utm_medium` etc. — not the whole
-`inflight_correction` object, not `undefined`, and not a literal string
-like `.utm_id`. A timeout in the Console panel
-(`sendHttpRequest: Request timed out`) on the very first hit to a region
-is expected — see "Cold starts" further down — retry once before
-assuming something's broken.
+check its **Transformations** panel shows all of them attached, with the
+fetch Transformation from Step 3 evaluating before every per-key one:
+
+![GA4 tag's Attached Transformations panel](images/tag-attached-transformations.png)
+
+Confirm "Outgoing HTTP Requests from Server" shows a real call to your
+`{region}.cr.utm-assistant.ai/inflight` endpoint, and that the tag's own
+Modified Event Data / Event data tab shows actual corrected values on
+`utm_medium` etc. — not the whole `inflight_correction` object, not
+`undefined`, and not a literal string like `.utm_id`. A timeout in the
+Console panel (`sendHttpRequest: Request timed out`) on the very first
+hit to a region is expected — see "Cold starts" further down — retry once
+before assuming something's broken.
 
 ### Data flow
 
@@ -183,12 +217,42 @@ assuming something's broken.
    template calling it directly from its own sandboxed JS.
 4. Each Event Data variable from Step 4 synchronously reads its own key
    back out of `inflight_correction`.
-5. **Apply Correction** (Priority 5, runs after Fetch Correction) writes
-   each Event Data variable's value into its matching top-level `utm_*`
-   parameter.
+5. Each per-key apply Transformation from Step 5 (Priority 5, runs after
+   Fetch Correction) writes its Event Data variable's value into its
+   matching top-level `utm_*` parameter — independently of the others,
+   since none of them depend on each other's output.
 6. Downstream tags fire and read the corrected (or, on any failure, the
    original) `utm_*` values straight from event data, with no per-tag
    configuration required.
+
+### Known limitation: `page_location` is not rewritten
+
+This template corrects the flat `utm_*` event-data keys — it does **not**
+rewrite `page_location` itself. `page_location` holds the full incoming
+URL as a plain string, and by the time our Transformations run, the GA4
+Client has already parsed it (Client → Transformations → Tags is sGTM's
+fixed order) — so a correction made here can't change what the Client
+already extracted. It also isn't propagated back into `page_location`'s
+own query string afterward, so the two diverge whenever a correction
+actually changes a value.
+
+Concretely, with a GA4 tag configured to forward all parameters (as in
+the screenshot above), the hit that reaches Google contains **both**: the
+corrected `utm_*` values as explicit event parameters, and the original,
+uncorrected `page_location` string with the raw (possibly broken) values
+still in its query string. In practice:
+- **Session source/medium, Traffic acquisition, and other campaign
+  reports** reflect the correction — these are driven by the explicit
+  `utm_*` parameters on the hit, which are the corrected ones by the time
+  the tag fires.
+- **Landing page + query string, raw BigQuery exports of `page_location`,
+  or any manual inspection of the hit's URL** still show the original,
+  uncorrected value.
+
+This is a known gap, not an oversight being silently carried forward. Fixing
+it would mean reconstructing `page_location`'s query string with the
+corrected values and writing it back via the same Augment Event mechanism
+— tracked as a follow-up, not implemented here.
 
 ## Setup (per sGTM container)
 

@@ -37,14 +37,37 @@ breaking the gallery's structure requirements.
   **Event Data** variable per `utm_*` key then reads
   `inflight_correction.utm_medium` back out via its Key Path (plain text,
   no `{{ }}` — Key Path doesn't resolve variable references, it's a
-  literal path into event data) — synchronous, no Promise involved.
-  Transformation 2 (lower Priority, e.g. 5 — Priority lives under
-  Advanced Settings, higher runs first, and GTM's default type-based
-  ordering doesn't disambiguate two Augment Event transformations against
-  each other, so this must be set explicitly) then maps each `utm_*` key
-  to its own Event Data variable, again as a bare reference. See
-  `___NOTES___` in `template.tpl` and the README's Installation section
-  (Steps 3-5) for the exact setup.
+  literal path into event data) — synchronous, no Promise involved. Then
+  **one more Augment Event Transformation per `utm_*` key** (not one
+  Transformation handling all of them — this is the exact structure
+  confirmed live in a real production container, see the README's
+  screenshots), each mapping its own key to its own Event Data variable
+  as a bare reference, Priority lower than Transformation 1's (e.g. 5 —
+  Priority lives under Advanced Settings, higher runs first, and GTM's
+  default type-based ordering doesn't disambiguate Augment Event
+  transformations against each other, so this must be set explicitly).
+  The per-key Transformations have no ordering dependency on each other,
+  only on Transformation 1. See `___NOTES___` in `template.tpl` and the
+  README's Installation section (Steps 3-5) for the exact setup.
+- **Known limitation, documented not fixed: `page_location` is never
+  rewritten.** Only the flat `utm_*` event-data keys are corrected — the
+  full `page_location` URL string still carries the original, uncorrected
+  query-string values, since sGTM's Client → Transformations → Tags order
+  means the GA4 Client already parsed `page_location` before these
+  Transformations run, and nothing here writes a corrected URL back into
+  it afterward either. With a GA4 tag forwarding all parameters, the hit
+  that reaches Google therefore carries both the corrected `utm_*` values
+  and the original `page_location` string in the same hit — session-level
+  attribution reports (driven by the explicit `utm_*` parameters) reflect
+  the correction, but `page_location`-derived reports (Landing page +
+  query string, raw BigQuery exports) don't. Fixing this would mean
+  reconstructing `page_location`'s query string with corrected values and
+  writing it back via the same Augment Event mechanism (no new
+  permission needed — Augment Event's write isn't gated by the template's
+  own declared permissions) — real scope (a serializer counterpart to
+  `parseUrl` doesn't exist here, plus new test scenarios and a live
+  re-verification pass), not done as part of this fix. See the README's
+  "Known limitation" section for the full writeup.
 - **Async via a returned Promise, same as any sGTM variable.** Returning a
   `sendHttpGet(...).then(...)` chain tells sGTM to pause any tag this
   variable (or an extractor variable derived from it) is mapped into,
