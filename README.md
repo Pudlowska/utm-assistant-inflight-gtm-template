@@ -8,7 +8,19 @@ documentation, minus `utm_creative_format`/`utm_marketing_tactic`, which
 GA4 accepts but doesn't report on — calls the Inflight ingestion API for the
 corrected values, and resolves to a JSON object of them — one call per
 event, corrected where possible, falling back to the original value
-otherwise. The template itself never writes event data (no
+otherwise.
+
+**Where it reads the UTM values from:** GA4 Client only populates these as
+flat event-data fields on some hits (typically the one that first detects a
+campaign, e.g. a session's first `page_view`) — a later `page_view` or
+`user_engagement` in the same session often has none of them, even though
+the real UTM link's parameters are still sitting in `page_location`'s query
+string on every hit. This template checks the flat event-data value first
+and falls back to parsing `page_location`'s query string when that's
+absent, so correction isn't limited to whichever one hit GA4 happened to
+forward the parameters on.
+
+The template itself never writes event data (no
 `setInEventData` equivalent for this template type — an earlier version
 tried that and it does not work). Instead, routing the resolved values
 into event data is done with sGTM's native **Augment Event Transformation**,
@@ -30,8 +42,9 @@ being referenced directly in a tag field.
 3. Search for **"Inflight - UTM Assistant – Real-Time UTM Correction"**.
 4. Click the template and select **Add to workspace**.
 5. Review the requested permissions (`read_event_data` — scoped to the 7
-   `utm_*` keys plus `x-ga-measurement_id`, `send_http_request`,
-   `access_template_storage`, `logging`) and click **Add**.
+   `utm_*` keys plus `x-ga-measurement_id` and `page_location`,
+   `send_http_request`, `access_template_storage`, `logging`) and click
+   **Add**.
 
 ### Step 2: Instantiate the Variable
 

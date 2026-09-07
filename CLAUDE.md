@@ -43,6 +43,22 @@ breaking the gallery's structure requirements.
   sequencing/priority needed. Sync paths (no-op, cache hit) just `return`
   a plain value instead of a Promise — both are valid returns from the
   same function.
+- **UTM source: event data or page_location, not either exclusively.**
+  Confirmed live (2026-09-07): a real GA4 Client hit does NOT reliably
+  carry the seven `utm_*` keys as flat event-data fields on every event —
+  only the hit that first detects a campaign (typically the session's
+  first `page_view`) gets them; a later `page_view` or `user_engagement`
+  in the same session can have none of the seven present in event data at
+  all, even though the real UTM link's parameters are still sitting in
+  `page_location`'s query string on every hit. `readIncomingUtms()`
+  therefore checks the flat `getEventData(key)` value first, and falls
+  back to parsing `page_location` via `parseUrl` (`readUtmsFromPageLocation()`)
+  when that's absent — `parseUrl` is a real sandbox API (no permission
+  needed, returns `undefined` on a malformed URL rather than throwing,
+  confirmed against Google's own server-side API docs). Event data wins
+  when both are present and disagree, on the assumption GA4's own
+  resolution is at least as trustworthy as re-parsing the URL by hand —
+  not verified against a real disagreement case, just the safer default.
 - **Per-event API call, not a cached ruleset.** Unlike the fast-path/
   slow-path design used elsewhere in the suite (ruleset fetched once per
   session and fuzzy-matched client-side — see SYSTEM-OVERVIEW.md), this
@@ -110,11 +126,15 @@ that problem first.
 `utm_medium`, `utm_campaign`, `utm_source_platform`, `utm_term`,
 `utm_content` — GA4's full reported set per Google's URL builder doc,
 minus `utm_creative_format`/`utm_marketing_tactic`, which GA4 doesn't
-report on) plus `x-ga-measurement_id`, `send_http_request` scoped to
-`https://*.cr.utm-assistant.ai/inflight*`, `access_template_storage`, and
-`logging` (debug only). No `write_event_data` — this template no longer
-writes event data at all; it only resolves to a value. The permission JSON
-in `template.tpl` was hand-authored, not exported from the GTM Template
+report on) plus `x-ga-measurement_id` and `page_location`, `send_http_request`
+scoped to `https://*.cr.utm-assistant.ai/inflight*`, `access_template_storage`,
+and `logging` (debug only). `page_location` was added 2026-09-07 — see
+"UTM source: event data or page_location" below for why it's needed.
+`parseUrl` requires no permission declaration at all (pure string parsing,
+no side effects) — confirmed against Google's own server-side API docs.
+No `write_event_data` — this template no longer writes event data at all;
+it only resolves to a value. The permission JSON in `template.tpl` was
+hand-authored, not exported from the GTM Template
 Editor — treat it as a starting point and re-verify the Permissions tab in
 the actual editor before first real use.
 

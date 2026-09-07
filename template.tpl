@@ -104,6 +104,7 @@ ___TEMPLATE_PARAMETERS___
 ___SANDBOXED_JS_FOR_SERVER___
 
 const getEventData = require('getEventData');
+const parseUrl = require('parseUrl');
 const sendHttpGet = require('sendHttpGet');
 const sha256Sync = require('sha256Sync');
 const encodeUriComponent = require('encodeUriComponent');
@@ -121,13 +122,49 @@ const makeNumber = require('makeNumber');
 // that file's UTM_KEYS in sync.
 const UTM_KEYS = ['utm_id', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_source_platform', 'utm_term', 'utm_content'];
 
-// Only the utm_ keys actually present on this event — nothing to correct if none are set.
+// Fallback source for readIncomingUtms(), below: some GA4 Client hits
+// (confirmed live: a page_view or user_engagement event later in the same
+// session, not the one that first detected the campaign) carry none of
+// the seven utm_ keys as flat event-data fields at all, even though the
+// actual UTM link's parameters are still sitting in page_location's query
+// string on every hit. parseUrl requires no permission and never throws —
+// it returns undefined for a malformed URL, handled below.
+function readUtmsFromPageLocation() {
+  const pageLocation = getEventData('page_location');
+  if (!pageLocation) return {};
+  const parsed = parseUrl(pageLocation);
+  if (!parsed || !parsed.searchParams) return {};
+  const values = {};
+  for (let i = 0; i < UTM_KEYS.length; i++) {
+    const key = UTM_KEYS[i];
+    const raw = parsed.searchParams[key];
+    // A repeated query parameter comes back as an array; take the first
+    // value, matching how a browser's URLSearchParams.get() would behave.
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (value !== undefined && value !== null && value !== '') {
+      values[key] = value;
+    }
+  }
+  return values;
+}
+
+// Only the utm_ keys actually present on this event — nothing to correct
+// if none are set. Prefers the flat event-data key when GA4 Client has
+// already populated it; falls back to parsing it out of page_location's
+// query string otherwise (see readUtmsFromPageLocation above) — the two
+// sources should usually agree, but page_location is the one guaranteed
+// present on every hit carrying a real UTM link, not just the hit GA4
+// happened to forward the parameters on.
 function readIncomingUtms() {
+  const fromPageLocation = readUtmsFromPageLocation();
   const values = {};
   let hasAny = false;
   for (let i = 0; i < UTM_KEYS.length; i++) {
     const key = UTM_KEYS[i];
-    const value = getEventData(key);
+    const eventDataValue = getEventData(key);
+    const value = (eventDataValue !== undefined && eventDataValue !== null && eventDataValue !== '')
+      ? eventDataValue
+      : fromPageLocation[key];
     if (value !== undefined && value !== null && value !== '') {
       values[key] = value;
       hasAny = true;
@@ -362,6 +399,10 @@ ___SERVER_PERMISSIONS___
               {
                 "type": 1,
                 "string": "x-ga-measurement_id"
+              },
+              {
+                "type": 1,
+                "string": "page_location"
               }
             ]
           }
@@ -482,6 +523,81 @@ scenarios:
       assertThat(capturedUrl.indexOf('utm_source=ig') > -1).isEqualTo(true);
       assertThat(capturedOptions.headers['X-Api-Key']).isEqualTo('demo-api-key');
     });
+
+- name: utm params only in page_location's query string - falls back to parsing them there
+  code: |-
+    const Promise = require('Promise');
+    mock('logToConsole', () => {});
+    const eventValues = {
+      page_location: 'https://example.com/landing?utm_source=facebook&utm_medium=cpc&utm_campaign=test',
+      'x-ga-measurement_id': 'G-DEMO123'
+    };
+    mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
+    mock('templateDataStorage', {
+      getItemCopy: () => null,
+      setItemCopy: () => {},
+      removeItem: () => {},
+      clear: () => {}
+    });
+    let capturedUrl;
+    mock('sendHttpGet', (url) => {
+      capturedUrl = url;
+      return Promise.create((resolve) => resolve({statusCode: 200, body: '{}'}));
+    });
+    return runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then((result) => {
+      assertThat(capturedUrl.indexOf('utm_source=facebook') > -1).isEqualTo(true);
+      assertThat(capturedUrl.indexOf('utm_medium=cpc') > -1).isEqualTo(true);
+      assertThat(capturedUrl.indexOf('utm_campaign=test') > -1).isEqualTo(true);
+      assertThat(result.utm_source).isEqualTo('facebook');
+      assertThat(result.utm_medium).isEqualTo('cpc');
+      assertThat(result.utm_campaign).isEqualTo('test');
+    });
+
+- name: flat event-data utm value takes precedence over page_location when both are present and differ
+  code: |-
+    const Promise = require('Promise');
+    mock('logToConsole', () => {});
+    const eventValues = {
+      utm_source: 'from-event-data',
+      page_location: 'https://example.com/?utm_source=from-page-location',
+      'x-ga-measurement_id': 'G-DEMO123'
+    };
+    mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
+    mock('templateDataStorage', {
+      getItemCopy: () => null,
+      setItemCopy: () => {},
+      removeItem: () => {},
+      clear: () => {}
+    });
+    let capturedUrl;
+    mock('sendHttpGet', (url) => {
+      capturedUrl = url;
+      return Promise.create((resolve) => resolve({statusCode: 200, body: '{}'}));
+    });
+    return runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'}).then(() => {
+      assertThat(capturedUrl.indexOf('utm_source=from-event-data') > -1).isEqualTo(true);
+      assertThat(capturedUrl.indexOf('from-page-location') > -1).isEqualTo(false);
+    });
+
+- name: malformed page_location does not throw - parseUrl returns undefined, treated as no fallback
+  code: |-
+    mock('logToConsole', () => {});
+    const eventValues = { page_location: 'not a url' };
+    mock('getEventData', (key) => (eventValues[key] !== undefined ? eventValues[key] : undefined));
+    mock('templateDataStorage', {
+      getItemCopy: () => null,
+      setItemCopy: () => {},
+      removeItem: () => {},
+      clear: () => {}
+    });
+    let httpCallCount = 0;
+    mock('sendHttpGet', () => {
+      httpCallCount++;
+      return { then: () => {} };
+    });
+    const result = runCode({apiKey: 'demo-api-key', cloudRegion: 'us-central1', enableCache: false, cacheTtlSeconds: '21600', requestTimeoutMs: '400'});
+    assertThat(httpCallCount).isEqualTo(0);
+    assertThat(result).isEqualTo(null);
 
 - name: no property id resolvable - resolves the raw utms unchanged and does not call the API
   code: |-
