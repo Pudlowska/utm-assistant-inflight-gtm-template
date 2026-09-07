@@ -1,6 +1,8 @@
 homepage: https://www.utm-assistant.ai
 documentation: https://github.com/Pudlowska/utm-assistant-inflight-gtm-template
 versions:
+  - sha: 13e176c7e30a1c46add7cb2f7d54c6190bbba3f3
+    changeNotes: Fix undeclared-variable parser error -- use getType(raw) === 'array' instead of Array.isArray(), no global Array in this sandbox
   - sha: d851a06d25b972f000fb644949eddc343d06b1ba
     changeNotes: Fall back to parsing page_location's query string for utm_* values when GA4 Client hasn't populated them as flat event-data fields (confirmed live -- only the campaign-detecting hit gets them); new page_location read_event_data permission required
   - sha: 76189d0e236f5a70890b975aa1bf1477a3ec3f00
