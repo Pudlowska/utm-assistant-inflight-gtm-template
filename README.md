@@ -112,10 +112,7 @@ For each `utm_*` key you want corrected:
 1. **Variables** → **User-Defined Variables** → **New**.
 2. Variable type: **Event Data**.
 3. **Key Path**: `inflight_correction.utm_id` (swap in the key name each
-   time) — **plain text, no `{{ }}` braces**. Key Path reads a literal
-   path into event data; it does not resolve variable references, so
-   `{{Inflight - Correction Data}}.utm_id` here fails the same
-   undefined-with-no-error way Step 3's warning describes.
+   time) — **plain text, no `{{ }}` braces**.
 4. Name it `Inflight - utm_id` and **Save**.
 5. Repeat for each of the seven keys you need (`utm_source`,
    `utm_medium`, `utm_campaign`, `utm_source_platform`, `utm_term`,
@@ -249,20 +246,15 @@ would otherwise have sent).
 ### Cold starts
 
 The ingestion endpoint (`utm-assistant-cr-inflight`) runs with
-`min_instance_count: 0` in every region by design — cost-conscious
-default until a region has real paying traffic to justify keeping it
-warm. A cold start there takes roughly 1-2 seconds, which blows past
-this template's default 400ms **Request timeout (ms)** setting. Expect
-the *first* hit to a given region (after any idle period) to time out
-and fail open — you'll see `sendHttpRequest: Request timed out` in
-Preview's Console panel, and `inflight_correction` will still contain
-the original, uncorrected UTM values (fail-open, not an error). This is
-expected, not a bug: simply retry the same hit — the container is warm
-for a while afterward, and a second attempt within a minute or two
-should get a real response. If cold starts are a persistent problem for
-a specific region, that's a signal to raise with whoever manages
-`utm-assistant-cr-inflight`'s infra about warming that one region,
-rather than something to fix on the template/container side.
+`min_instance_count: 0` in every region. A cold start there takes
+roughly 1-2 seconds, which blows past this template's default 400ms
+**Request timeout (ms)** setting. Expect the *first* hit to a given
+region (after any idle period) to time out and fail open — you'll see
+`sendHttpRequest: Request timed out` in Preview's Console panel, and
+`inflight_correction` will still contain the original, uncorrected UTM
+values (fail-open, not an error). This is expected, not a bug: simply
+retry the same hit — the container is warm for a while afterward, and a
+second attempt within a minute or two should get a real response.
 
 ## Cloud Region mapping
 
