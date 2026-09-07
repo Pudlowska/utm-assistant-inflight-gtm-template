@@ -104,6 +104,7 @@ ___TEMPLATE_PARAMETERS___
 ___SANDBOXED_JS_FOR_SERVER___
 
 const getEventData = require('getEventData');
+const getType = require('getType');
 const parseUrl = require('parseUrl');
 const sendHttpGet = require('sendHttpGet');
 const sha256Sync = require('sha256Sync');
@@ -140,7 +141,10 @@ function readUtmsFromPageLocation() {
     const raw = parsed.searchParams[key];
     // A repeated query parameter comes back as an array; take the first
     // value, matching how a browser's URLSearchParams.get() would behave.
-    const value = Array.isArray(raw) ? raw[0] : raw;
+    // No global Array in this sandbox (confirmed live: "undeclared
+    // variable Array" from the Template Editor's own parser) -- getType()
+    // is the sandboxed equivalent of Array.isArray() here.
+    const value = getType(raw) === 'array' ? raw[0] : raw;
     if (value !== undefined && value !== null && value !== '') {
       values[key] = value;
     }
